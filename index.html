@@ -1,0 +1,2063 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Provenance Lab: a clinical informatics teaching lab on results pending at discharge. Prototype with synthetic patient data.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Provenance Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a chart workstation. Source evidence left, AI draft center, provenance inspector right; stacks to one column on phones.
+   Palette: Gossamer. Clean white (#FAFAFA) and light gray (#CDCDCF) ground, mid gray (#939599), turquoise (#2BCFCE) for selection, coral (#EC4D25) for actions.
+   Light mode deepens both accents so text stays readable; dark mode uses them near full strength.
+   Type: Newsreader for headings, Instrument Sans for reading and labels, Plex Mono for record IDs. */
+:root {
+  --paper: #FAFAFA;
+  --surface: #FFFFFF;
+  --sunk: #EDEDEF;
+  --ink: #1E2024;
+  --muted: #5C5F65;
+  --rule: #CDCDCF;
+  --accent: #0B7A79;
+  --accent-soft: rgba(43, 207, 206, 0.14);
+  --link-soft: rgba(43, 207, 206, 0.22);
+  --btn-bg: #C23D1A;
+  --btn-fg: #FFFFFF;
+  --flag: #F5A68F;
+  --flag-soft: rgba(236, 77, 37, 0.16);
+  --ok: #2E7A4E;
+  --ok-soft: rgba(46, 122, 78, 0.1);
+  --warn: #8F5A00;
+  --warn-soft: rgba(196, 128, 20, 0.12);
+  --bad: #B3261E;
+  --bad-soft: rgba(179, 38, 30, 0.08);
+  --display: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #17181B; --surface: #202125; --sunk: #2A2B30; --ink: #FAFAFA; --muted: #A3A5AA; --rule: #393B40;
+    --accent: #2BCFCE; --accent-soft: rgba(43, 207, 206, 0.14); --link-soft: rgba(43, 207, 206, 0.2); --btn-bg: #F26A45; --btn-fg: #17181B;
+    --flag: #F2876A; --flag-soft: rgba(236, 77, 37, 0.22); --ok: #7DD3A0; --ok-soft: rgba(125, 211, 160, 0.12);
+    --warn: #F0B86E; --warn-soft: rgba(240, 184, 110, 0.12); --bad: #FF8F85; --bad-soft: rgba(255, 143, 133, 0.12); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #17181B; --surface: #202125; --sunk: #2A2B30; --ink: #FAFAFA; --muted: #A3A5AA; --rule: #393B40;
+  --accent: #2BCFCE; --accent-soft: rgba(43, 207, 206, 0.14); --link-soft: rgba(43, 207, 206, 0.2); --btn-bg: #F26A45; --btn-fg: #17181B;
+  --flag: #F2876A; --flag-soft: rgba(236, 77, 37, 0.22); --ok: #7DD3A0; --ok-soft: rgba(125, 211, 160, 0.12);
+  --warn: #F0B86E; --warn-soft: rgba(240, 184, 110, 0.12); --bad: #FF8F85; --bad-soft: rgba(255, 143, 133, 0.12); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; padding-inline: 16px; padding-block: 0 48px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; line-height: 1.2; letter-spacing: -0.005em; }
+p { margin: 0; }
+button, textarea, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mono { font-family: var(--mono); font-size: 0.82em; }
+.label { font-family: var(--display); font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.wrap { max-width: 1320px; margin: 0 auto; }
+
+/* Top bar */
+.bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding-block: 14px; border-bottom: 1px solid var(--rule); margin-bottom: 20px; }
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand h1 { font-size: 18px; letter-spacing: -0.01em; }
+.brand .mono { color: var(--muted); }
+.bar-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); background: var(--surface); white-space: nowrap; }
+.pill.warn { color: var(--warn); border-color: transparent; background: var(--warn-soft); }
+.btn { border: 1px solid var(--rule); background: var(--surface); padding: 7px 14px; border-radius: var(--radius); font-weight: 500; font-size: 14px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-fg); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { color: var(--ink); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Intro */
+.intro { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.intro-lead h2 { font-size: clamp(26px, 3.4vw, 38px); letter-spacing: -0.02em; max-width: 18ch; }
+.intro-lead > p { margin-top: 14px; max-width: 60ch; color: var(--muted); font-size: 16px; }
+.steps { margin-top: 24px; display: grid; gap: 12px; max-width: 60ch; padding: 0; list-style: none; counter-reset: step; }
+.steps li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; counter-increment: step; }
+.steps li::before { content: counter(step); font-family: var(--mono); font-size: 12px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--rule); display: grid; place-items: center; color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); }
+.setup { padding: 20px; display: grid; gap: 18px; }
+.case-list { display: grid; gap: 8px; }
+.case-opt { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 14px; border: 1px solid var(--rule); border-radius: var(--radius); text-align: left; background: var(--surface); }
+.case-opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.case-opt strong { font-weight: 600; }
+.case-opt span.sub { grid-column: 1 / -1; color: var(--muted); font-size: 13.5px; }
+.objective { font-size: 14px; color: var(--muted); border-left: 2px solid var(--rule); padding-left: 12px; }
+.check-line { font-size: 12.5px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); display: inline-block; }
+.dot.bad { background: var(--bad); }
+
+/* Workstation */
+.task { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; padding: 12px 16px; margin-bottom: 16px; background: var(--accent-soft); border-radius: var(--radius); }
+.task-text { display: grid; gap: 6px; min-width: 0; flex: 1 1 520px; }
+.task p { max-width: 95ch; }
+.task .label { color: var(--accent); margin-right: 8px; }
+.patient { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; padding: 10px 16px; margin-bottom: 16px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); }
+.patient strong { font-family: var(--display); font-size: 16px; }
+.patient span { color: var(--muted); font-size: 13.5px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.95fr); gap: 16px; align-items: start; }
+.col { min-width: 0; }
+.pane-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+.pane-body { padding: 12px 16px 16px; }
+.tabs { display: flex; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid var(--rule); overflow-x: auto; }
+.tab { border: none; background: none; padding: 8px 10px; font-size: 13.5px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 500; }
+.source-scroll { max-height: 64vh; overflow-y: auto; }
+.tline { display: grid; grid-template-columns: 34px 70px minmax(0, 1fr); gap: 8px; padding: 7px 8px; border-radius: 4px; font-size: 14px; transition: background 0.2s; }
+.tline .mono { color: var(--muted); padding-top: 2px; }
+.tline .who { font-size: 12.5px; color: var(--muted); padding-top: 1px; }
+.tline.hl { background: var(--link-soft); }
+.tline.hl .mono { color: var(--accent); font-weight: 500; }
+.rec { padding: 10px 0; border-bottom: 1px solid var(--rule); display: grid; gap: 2px; }
+.rec:last-child { border-bottom: none; }
+.rec .meta { font-size: 12.5px; color: var(--muted); }
+.rec.hl { background: var(--link-soft); margin-inline: -8px; padding-inline: 8px; border-radius: 4px; }
+
+.note-head { display: grid; gap: 2px; }
+.note-head h3 { font-size: 16px; }
+.note-head span { font-size: 12.5px; color: var(--muted); }
+.note-sec { padding-top: 10px; }
+.note-sec + .note-sec { border-top: 1px dashed var(--rule); margin-top: 10px; }
+.stmt { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; align-items: start; width: 100%; text-align: left; border: 1px solid transparent; background: none; padding: 7px 8px; border-radius: 4px; margin-top: 4px; }
+.stmt:hover { background: var(--sunk); }
+.stmt[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.stmt .mono { color: var(--muted); padding-top: 2px; }
+.stmt .txt { min-width: 0; }
+.stmt.flagged .txt { background: var(--flag-soft); box-shadow: 0 0 0 2px var(--flag-soft); border-radius: 2px; }
+.stmt .deleted { text-decoration: line-through; color: var(--muted); }
+.stmt .edited { display: block; font-size: 13px; color: var(--accent); margin-top: 2px; }
+.marks { display: flex; gap: 4px; align-items: center; padding-top: 2px; }
+.mk { font-size: 11px; font-family: var(--mono); padding: 1px 5px; border-radius: 3px; background: var(--sunk); color: var(--muted); }
+.mk.flag { background: var(--flag); color: #1E2024; }
+.mk.dec { background: var(--accent-soft); color: var(--accent); }
+
+.inspector { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); }
+.empty { color: var(--muted); font-size: 14px; padding: 8px 0 4px; display: grid; gap: 8px; }
+.insp-stmt { font-size: 15px; padding: 10px 12px; background: var(--sunk); border-radius: 4px; margin: 8px 0 12px; }
+.insp-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prov { margin-top: 14px; display: grid; gap: 8px; }
+.prov-item { border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; font-size: 13.5px; display: grid; gap: 2px; }
+.prov-item .k { font-size: 12px; color: var(--muted); }
+.prov-none { border-style: dashed; color: var(--warn); }
+.locked { font-size: 13.5px; color: var(--muted); border: 1px dashed var(--rule); border-radius: 4px; padding: 10px 12px; margin-top: 14px; }
+.decide { margin-top: 16px; display: grid; gap: 10px; }
+.opts { display: grid; gap: 6px; }
+.opt { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 4px; font-size: 14px; cursor: pointer; }
+.opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.opt input { margin-top: 4px; accent-color: var(--accent); }
+textarea { width: 100%; min-height: 64px; resize: vertical; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); font-size: 14px; }
+.fb { border-radius: 4px; padding: 10px 12px; font-size: 14px; display: grid; gap: 4px; }
+.fb strong { font-family: var(--display); font-size: 13px; letter-spacing: 0.02em; }
+.fb.accepted { background: var(--ok-soft); } .fb.accepted strong { color: var(--ok); }
+.fb.defensible, .fb.partial { background: var(--warn-soft); } .fb.defensible strong, .fb.partial strong { color: var(--warn); }
+.fb.not { background: var(--bad-soft); } .fb.not strong { color: var(--bad); }
+.fb .ref { color: var(--muted); font-size: 13.5px; }
+
+.sign-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; margin-top: 16px; padding: 12px 16px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); }
+.sign-bar p { color: var(--muted); font-size: 14px; }
+.confirm { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--warn); border-radius: var(--radius); background: var(--warn-soft); display: grid; gap: 10px; }
+.confirm .row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Debrief */
+.debrief { display: grid; gap: 20px; max-width: 980px; }
+.debrief h2 { font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.02em; }
+.event { border: 1px solid var(--bad); background: var(--bad-soft); border-radius: var(--radius); padding: 14px 16px; display: grid; gap: 6px; }
+.event .label { color: var(--bad); }
+.event .note { font-size: 13px; color: var(--muted); }
+.sec { padding: 18px 20px; display: grid; gap: 12px; }
+.sec h3 { font-size: 17px; }
+.stats { display: flex; flex-wrap: wrap; gap: 10px 28px; }
+.stat { display: grid; }
+.stat b { font-family: var(--display); font-size: 22px; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 620px; }
+th { text-align: left; font-family: var(--display); font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+td { padding: 9px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+.v { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.v.accepted { background: var(--ok-soft); color: var(--ok); }
+.v.defensible, .v.partial { background: var(--warn-soft); color: var(--warn); }
+.v.not { background: var(--bad-soft); color: var(--bad); }
+.signed p { padding: 3px 0; }
+.signed .sec-name { margin-top: 8px; }
+.signed .ver { font-size: 12px; color: var(--muted); }
+blockquote { margin: 0; padding: 12px 14px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 0 4px 4px 0; font-size: 14.5px; }
+.checklist { display: grid; gap: 6px; }
+.checklist label { display: flex; gap: 8px; align-items: flex-start; font-size: 14.5px; }
+.checklist input { margin-top: 4px; accent-color: var(--accent); }
+ul.points { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 72ch; }
+.actions-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.toast { font-size: 13px; color: var(--ok); }
+.log { font-family: var(--mono); font-size: 12.5px; color: var(--muted); max-height: 220px; overflow-y: auto; display: grid; gap: 2px; }
+details summary { cursor: pointer; font-weight: 500; }
+.example-note { font-size: 13px; color: var(--muted); }
+
+
+.mode { font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; align-self: center; justify-self: end; }
+.mode.easy { background: var(--ok-soft); color: var(--ok); }
+.mode.hard { background: var(--bad-soft); color: var(--bad); }
+.cite-hint { font-size: 12.5px; color: var(--accent); }
+.search { display: flex; align-items: center; gap: 8px; padding: 8px 16px 0; }
+.search input { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--rule); border-radius: 4px; background: var(--surface); font-size: 14px; }
+.search .mono { color: var(--muted); white-space: nowrap; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tline.citable, .rec.citable { cursor: pointer; }
+.tline.citable:hover { background: var(--sunk); }
+.rec.citable:hover { background: var(--sunk); margin-inline: -8px; padding-inline: 8px; border-radius: 4px; }
+.tline.cited, .rec.cited { background: var(--link-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.rec.cited { margin-inline: -8px; padding-inline: 8px; border-radius: 4px; }
+.tline.cited .mono { color: var(--accent); font-weight: 500; }
+.tline.ref, .rec.ref { outline: 2px solid var(--ok); outline-offset: -2px; }
+.tline.dim { opacity: 0.4; }
+mark { background: var(--flag-soft); color: inherit; border-radius: 2px; padding: 0 1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-family: var(--mono); font-size: 12.5px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); }
+.err-tag { font-family: var(--display); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--bad); }
+
+/* Lab */
+.case-opt.featured { border-width: 2px; }
+.mode.lab { background: var(--accent-soft); color: var(--accent); }
+.stepper { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.stepper li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); padding: 6px 12px 6px 6px; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface); }
+.stepper li .mono { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: var(--sunk); }
+.stepper li.cur { color: var(--ink); border-color: var(--accent); font-weight: 600; }
+.stepper li.cur .mono { background: var(--accent); color: var(--paper); }
+.stepper li.done .mono { background: var(--ok-soft); color: var(--ok); }
+.brief { padding: 24px; display: grid; gap: 14px; max-width: 860px; }
+.brief h2 { font-size: clamp(24px, 3vw, 32px); letter-spacing: -0.02em; }
+.brief > p { max-width: 68ch; font-size: 15.5px; }
+.brief .task { margin: 0; }
+.chain-panel { padding: 14px 16px; margin-bottom: 16px; display: grid; gap: 6px; }
+.chain-wrap { display: grid; gap: 6px; }
+.chain-wrap + .chain-wrap { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--rule); }
+.chain { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.st { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); background: var(--surface); }
+.st.on { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); font-weight: 600; }
+.st.miss { border: 1px dashed var(--bad); background: var(--bad-soft); color: var(--bad); font-weight: 600; }
+.chain .arr { color: var(--muted); font-size: 13px; }
+.lab-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 16px; align-items: start; margin-bottom: 16px; }
+.lab-grid > section { min-width: 0; }
+.tl { display: grid; gap: 4px; }
+.ev { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 8px; align-items: start; text-align: left; padding: 8px; border: 1px solid transparent; border-radius: 4px; background: none; }
+.ev:hover { background: var(--sunk); }
+.ev[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.ev .mono { color: var(--muted); padding-top: 2px; }
+.ev > span:nth-child(2) { display: grid; min-width: 0; }
+.ev-when { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.ev-actor { font-size: 13px; color: var(--muted); }
+.ev.opened .mk { background: var(--ok-soft); color: var(--ok); }
+.ev-title { font-size: 17px; }
+.ev-meta { font-size: 13px; color: var(--muted); margin: 2px 0 10px; }
+.prov-table { min-width: 0; margin-top: 12px; font-size: 13.5px; }
+.prov-table th { text-transform: none; letter-spacing: 0; font-family: var(--body); font-size: 13px; font-weight: 500; color: var(--muted); width: 42%; }
+fieldset.q { border: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+fieldset.q + fieldset.q { margin-top: 10px; padding-top: 14px; border-top: 1px solid var(--rule); }
+fieldset.q legend { font-weight: 600; padding: 0; margin-bottom: 8px; }
+.replay { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--rule); display: grid; gap: 14px; }
+.replay li { display: grid; gap: 2px; position: relative; }
+.replay li::before { content: ""; position: absolute; left: -22px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--rule); }
+.replay li.new::before { background: var(--accent); }
+.replay li p { color: var(--muted); max-width: 70ch; }
+.lever { padding: 18px 20px; margin-bottom: 14px; display: grid; gap: 14px; }
+.lever-head { display: grid; gap: 6px; }
+.lever-head h3 { font-size: 17px; }
+.pill.finding { justify-self: start; color: var(--bad); border-color: transparent; background: var(--bad-soft); }
+.lever-why { color: var(--muted); max-width: 75ch; }
+.lever-ev { font-size: 13.5px; max-width: 80ch; }
+.lever-ev .label { color: var(--accent); margin-right: 4px; }
+.lever-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+.lopt { display: grid; gap: 8px; align-content: start; padding: 12px; border: 1px solid var(--rule); border-radius: var(--radius); cursor: pointer; background: var(--surface); }
+.lopt:hover { border-color: var(--muted); }
+.lopt.sel { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.lopt-top { display: grid; grid-template-columns: auto 1fr; gap: 4px 8px; align-items: start; font-size: 14px; }
+.lopt-top input { margin-top: 3px; accent-color: var(--accent); }
+.lopt-top .cur-tag { grid-column: 2; justify-self: start; }
+.cur-tag { font-family: var(--display); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--rule); border-radius: 999px; padding: 1px 7px; }
+ul.pc { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; font-size: 13px; }
+ul.pc li { padding-left: 18px; position: relative; }
+ul.pc li::before { position: absolute; left: 0; font-weight: 700; }
+ul.pc li.pro::before { content: "+"; color: var(--ok); }
+ul.pc li.con::before { content: "−"; color: var(--bad); }
+.work { font-size: 12.5px; color: var(--warn); }
+.callouts { display: grid; gap: 4px; font-size: 14px; }
+.callouts .label { color: var(--accent); margin-right: 6px; }
+.cmp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.cmp { border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px; display: grid; gap: 8px; align-content: start; }
+.cmp.hl { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cmp header { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
+.cmp .v { justify-self: start; white-space: normal; }
+ul.chg { margin: 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
+.cmp-line { font-size: 13px; }
+.cmp-line .label { margin-right: 4px; }
+.replay li.win strong { color: var(--ok); }
+.research-note { font-size: 14px; border-left: 3px solid var(--accent); padding-left: 12px; display: grid; gap: 4px; }
+.event.gap { border-color: var(--warn); background: var(--warn-soft); }
+.event.gap .label { color: var(--warn); }
+.refs { display: grid; gap: 12px; }
+.ref a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.ref a:hover { text-decoration: underline; }
+.ref p { font-size: 14px; color: var(--muted); max-width: 72ch; }
+@media (max-width: 900px) { .lab-grid { grid-template-columns: 1fr; } }
+
+/* Redesign, compact */
+.levers { display: grid; gap: 10px; margin-bottom: 16px; }
+.levers .lever { padding: 14px 16px; margin: 0; gap: 10px; }
+.lever-head { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; }
+.lever-n { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--sunk); color: var(--muted); }
+.lever.open .lever-n { background: var(--accent); color: var(--paper); }
+.lever-head h3 { font-size: 16px; }
+.finding { font-size: 12.5px; color: var(--muted); }
+.chips-row { display: flex; flex-wrap: wrap; gap: 8px; padding-left: 38px; }
+.chip-opt { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border: 1px solid var(--rule); border-radius: 999px; font-size: 14px; cursor: pointer; background: var(--surface); }
+.chip-opt:hover { border-color: var(--muted); }
+.chip-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.chip-opt:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip-opt.sel { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.cur-dot { font-size: 10.5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.lever-detail { margin-left: 38px; padding: 10px 12px; border-radius: 4px; background: var(--sunk); display: grid; gap: 8px; }
+.lever-full { font-size: 14px; font-weight: 500; }
+.lever-more { justify-self: start; margin-left: 30px; padding: 2px 8px; font-size: 13px; }
+.chg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.mini { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+.outcome details, .cmp details { font-size: 14px; }
+details.fold > summary { list-style: none; display: flex; align-items: center; gap: 8px; }
+details.fold > summary::before { content: "›"; color: var(--muted); transition: transform 0.15s; }
+details.fold[open] > summary::before { transform: rotate(90deg); }
+details.fold > summary h3 { display: inline; }
+@media (max-width: 760px) { .chips-row, .lever-detail { padding-left: 0; margin-left: 0; } .lever-more { margin-left: 0; } }
+
+/* v0.4 additions */
+.cite-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cite-row .label { margin-right: 4px; }
+.cite-chip { position: relative; font-family: var(--mono); font-size: 12.5px; padding: 3px 9px; border: 1px solid var(--rule); border-radius: 999px; cursor: pointer; background: var(--surface); }
+.cite-chip input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.cite-chip:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cite-chip.sel { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.cite-chip:has(input:disabled) { opacity: 0.4; cursor: not-allowed; }
+.st.out { border-style: dashed; color: var(--muted); background: transparent; }
+.because { display: block; font-size: 12px; color: var(--accent); margin-top: 2px; }
+.facts { display: grid; gap: 4px; font-size: 14px; }
+.facts .label { margin-right: 6px; }
+.pred-check { border: 1px dashed var(--rule); border-radius: 4px; padding: 10px 12px; display: grid; gap: 4px; font-size: 14px; }
+.pred-check.match { border-color: var(--ok); }
+.pred-check .label { margin-right: 6px; }
+fieldset.predict { padding-top: 6px; }
+.tradeoff { font-size: 14px; font-weight: 500; }
+.cmp-out { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cmp-out .label { min-width: 46px; }
+.pill.warn { color: var(--warn); border-color: transparent; background: var(--warn-soft); }
+
+.trace { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 14px; }
+.trace dt { font-family: var(--display); font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding-top: 2px; }
+.trace dd { margin: 0; }
+@media (max-width: 520px) { .trace { grid-template-columns: 1fr; } .trace dd { margin-bottom: 6px; } }
+
+.summary-card { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--rule); border-radius: 4px; }
+.summary-card .v { margin-right: 6px; }
+details.optional-q { border-top: 1px solid var(--rule); padding-top: 12px; }
+details.optional-q > summary { color: var(--accent); }
+details.optional-q[open] > summary { margin-bottom: 10px; }
+
+.cmp-why { font-size: 13px; color: var(--ink); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.cmp-why .label { margin-right: 4px; }
+
+.todo { border: 1px dashed var(--warn); background: var(--warn-soft); border-radius: 4px; padding: 10px 12px; display: grid; gap: 6px; }
+.todo .label { color: var(--warn); }
+.todo ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.todo li { display: flex; gap: 8px; align-items: baseline; }
+.todo li.done { color: var(--muted); text-decoration: line-through; }
+.todo .tick { width: 14px; flex: none; color: var(--warn); font-weight: 700; }
+.todo li.done .tick { color: var(--ok); }
+.req, .opt-tag { font-family: var(--display); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; }
+.req { color: var(--warn); background: var(--warn-soft); }
+.opt-tag { color: var(--muted); border: 1px solid var(--rule); }
+.reason-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Small labels read better in the sans than in the serif display face. */
+.label, th, .mode, .cur-tag, .cur-dot, .err-tag, .req, .opt-tag, .trace dt, .fb strong, .stepper li, .pill { font-family: var(--body); }
+.label { letter-spacing: 0.07em; }
+.stat b, .brand h1, .patient strong, .intro-lead h2, .brief h2, .debrief h2 { font-family: var(--display); }
+.intro-lead h2 { font-weight: 500; letter-spacing: -0.015em; }
+.stepper li.cur .mono { background: var(--btn-bg); color: var(--btn-fg); }
+.lever.open .lever-n { background: var(--btn-bg); color: var(--btn-fg); }
+@media (max-width: 1100px) {
+  .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .col-insp { grid-column: 1 / -1; order: 3; }
+  .inspector { position: static; }
+}
+@media (max-width: 760px) {
+  .intro { grid-template-columns: 1fr; }
+  .grid { grid-template-columns: 1fr; }
+  .col-note { order: 1; } .col-insp { order: 2; } .col-src { order: 3; }
+  .tline { grid-template-columns: 30px minmax(0, 1fr); }
+  .tline .who { grid-column: 2; }
+  .tline .ttext { grid-column: 2; }
+  .source-scroll { max-height: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+/* ============ CASE FILES (content, not code) ============ */
+// Shorthand for a statement the source fully supports.
+const OK = why => ({
+  keep: ["accepted", why],
+  verify: ["accepted", "Fine. The source already supports it."],
+  correct: ["not", "Nothing to correct. " + why],
+  remove: ["not", "Accurate information. Removing it loses part of the visit."]
+});
+const CASES = [
+{
+  id: "ambient-verify",
+  version: "0.3",
+  reviewStatus: "draft",
+  mode: "easy",
+  citations: "shown",
+  modeLabel: "Easy · the draft shows its citations",
+  title: "Verify the ambient scribe draft",
+  shortTitle: "Ambient AI note verification",
+  objective: "Verify an AI-drafted note against its source encounter, separate supported, contradicted, and unsourced statements, and edit the note until you would sign it.",
+  patient: { name: "Denise Walker", age: 58, sex: "F", mrn: "SIM-0482", context: "Clinic follow-up · hypertension, type 2 diabetes", synthetic: true },
+  sourceTabs: ["transcript", "meds", "vitals"],
+  transcript: [
+    { id: "T1", who: "Clinician", text: "What brings you in today?" },
+    { id: "T2", who: "Patient", text: "Follow-up for my blood pressure. I've had tightness in my chest walking up the stairs at work, the last three weeks or so." },
+    { id: "T3", who: "Clinician", text: "Does it go away when you rest?" },
+    { id: "T4", who: "Patient", text: "Yeah, after a minute or two." },
+    { id: "T5", who: "Clinician", text: "Are you taking the lisinopril?" },
+    { id: "T6", who: "Patient", text: "I stopped it about a month ago. The cough was driving me crazy." },
+    { id: "T7", who: "Clinician", text: "Any other medicines?" },
+    { id: "T8", who: "Patient", text: "Just the metformin, twice a day." },
+    { id: "T9", who: "Clinician", text: "Your blood pressure today is 152 over 94." },
+    { id: "T10", who: "Patient", text: "My dad had a heart attack at 60, so I worry." },
+    { id: "T11", who: "Clinician", text: "Let me listen to your heart and lungs." },
+    { id: "T12", who: "Clinician", text: "I'd like an EKG today, and we'll switch you to a different blood pressure medicine." }
+  ],
+  chart: {
+    meds: [
+      { id: "M1", name: "Metformin 500 mg by mouth twice daily", meta: "Entered Jun 12, 2025 by clinic MA · marked reviewed at 2 later visits" },
+      { id: "M2", name: "Lisinopril 10 mg by mouth daily", meta: "Entered Jan 8, 2024 by PCP · marked reviewed at 4 later visits" }
+    ],
+    vitals: [
+      { id: "V1", name: "BP 152/94 mmHg", meta: "Today, clinic intake" },
+      { id: "V2", name: "HR 78 · SpO2 98% on room air", meta: "Today, clinic intake" }
+    ]
+  },
+  sections: [
+    { name: "History of present illness", stmts: ["S1", "S2", "S3"] },
+    { name: "Medications", stmts: ["S4"] },
+    { name: "Family history", stmts: ["S5"] },
+    { name: "Vitals", stmts: ["S7"] },
+    { name: "Exam", stmts: ["S6"] },
+    { name: "Plan", stmts: ["S8", "S9"] }
+  ],
+  statements: {
+    S1: { text: "58-year-old woman presents for hypertension follow-up.",
+      links: [{ kind: "transcript", ids: ["T2"] }],
+      reference: "keep",
+      fb: {
+        keep: ["accepted", "Supported by T2. Leaving accurate statements alone is part of efficient review."],
+        verify: ["accepted", "Fine. T2 already supports it, so there is little to verify."],
+        correct: ["not", "Nothing to correct. T2 supports this. Unneeded edits add to review time."],
+        remove: ["not", "This is accurate and frames the visit. Removing it loses context."] } },
+    S2: { text: "Patient denies chest pain.",
+      links: [{ kind: "transcript", ids: ["T2", "T3", "T4"] }],
+      error: true,
+      reference: "correct",
+      refText: "Reports 3 weeks of chest tightness when climbing stairs, relieved by rest within 1 to 2 minutes.",
+      critical: true,
+      fb: {
+        correct: ["accepted", "T2 to T4 describe exertional chest tightness relieved by rest. The draft cited those lines and still reversed them. A negation error flips the most important finding of the visit."],
+        remove: ["partial", "Removing the false denial helps, but the note now omits the symptom that most changes today's plan."],
+        verify: ["not", "The cited source already contradicts it. There is nothing to confirm from memory."],
+        keep: ["not", "The transcript directly contradicts this. Signing it documents that the patient denied the symptom she reported."] } },
+    S3: { text: "Taking lisinopril as prescribed with good adherence.",
+      links: [{ kind: "transcript", ids: ["T5", "T6"] }, { kind: "chart", tab: "meds", ids: ["M2"], label: "Medication list", detail: "Lisinopril 10 mg daily, still active on the list" }],
+      error: true,
+      reference: "correct",
+      refText: "Stopped lisinopril about 1 month ago because of cough.",
+      fb: {
+        correct: ["accepted", "T6 says she stopped it a month ago because of cough. The active medication list is stale too, which is likely where the draft's assumption came from."],
+        remove: ["partial", "Removes the error, but the nonadherence and its cause drive today's medication change."],
+        verify: ["not", "T6 already answers this. The chart list and the conversation disagree, and the conversation is newer."],
+        keep: ["not", "Contradicted by T6. The draft appears to have trusted the active medication list over the patient."] } },
+    S4: { text: "Metformin 500 mg twice daily.",
+      links: [{ kind: "transcript", ids: ["T8"] }, { kind: "chart", tab: "meds", ids: ["M1"], label: "Medication list", detail: "Metformin 500 mg twice daily" }],
+      reference: "verify",
+      refText: "Metformin twice daily (dose per chart list, to confirm).",
+      fb: {
+        verify: ["accepted", "Good call. Frequency comes from T8, but the dose came from the chart list, not the conversation. Confirm it before signing."],
+        keep: ["defensible", "Acceptable if the list is current, but the dose never came up in the visit. Know which source you are signing."],
+        correct: ["defensible", "Editing to what was said, metformin twice daily, is defensible if you cannot confirm the dose."],
+        remove: ["not", "The patient confirmed metformin twice daily in T8. Removing it loses accurate information."] } },
+    S5: { text: "Family history: father with MI at age 60.",
+      links: [{ kind: "transcript", ids: ["T10"] }],
+      reference: "keep",
+      fb: {
+        keep: ["accepted", "Supported by T10, and relevant given her exertional symptoms."],
+        verify: ["accepted", "Fine. T10 supports it."],
+        correct: ["not", "Nothing to correct. T10 supports this."],
+        remove: ["not", "Accurate and clinically relevant. Keep it."] } },
+    S6: { text: "Lungs clear to auscultation bilaterally. Regular rate and rhythm, no murmurs.",
+      links: [],
+      noLinkNote: "No transcript line. T11 shows an exam happened, but no findings were spoken.",
+      reference: "verify",
+      fb: {
+        verify: ["accepted", "The right approach. An exam happened (T11) but the findings were never spoken, so the draft could not have heard them. Keep them only if you performed the exam and recall them."],
+        correct: ["defensible", "Fine if you edit the findings to what you actually found."],
+        remove: ["defensible", "Safe if you cannot recall the findings. A shorter exam you verified beats a full exam you did not."],
+        keep: ["not", "These findings have no source. Signing them unchecked attests to details the note cannot support."] } },
+    S7: { text: "BP 152/94.",
+      links: [{ kind: "transcript", ids: ["T9"] }, { kind: "chart", tab: "vitals", ids: ["V1"], label: "Vitals", detail: "BP 152/94 mmHg at intake" }],
+      reference: "keep",
+      fb: {
+        keep: ["accepted", "Two independent sources agree: T9 and the intake vitals."],
+        verify: ["accepted", "Fine. Two sources already agree."],
+        correct: ["not", "Nothing to correct. T9 and intake vitals match."],
+        remove: ["not", "Accurate and central to a hypertension visit."] } },
+    S8: { text: "Plan: continue lisinopril. Recheck blood pressure in 3 months.",
+      links: [{ kind: "transcript", ids: ["T12"] }],
+      error: true,
+      reference: "correct",
+      refText: "Plan: EKG today. Change antihypertensive given ACE inhibitor cough. Further evaluation of exertional chest tightness.",
+      fb: {
+        correct: ["accepted", "T12 describes an EKG today and a medication switch. The draft produced a routine plan that matches neither the visit nor S3's correction."],
+        remove: ["partial", "Removes the wrong plan but leaves the note with no plan at all."],
+        verify: ["not", "T12 already contradicts it."],
+        keep: ["not", "This plan continues a medication the patient stopped and drops the EKG that was ordered."] } },
+    S9: { text: "Counseled on low-sodium diet.",
+      links: [],
+      noLinkNote: "No transcript line mentions diet or counseling.",
+      error: true,
+      reference: "remove",
+      fb: {
+        remove: ["accepted", "Nothing in the encounter supports it. Drafts can fill in routine counseling that never happened, and documenting a service not provided is a compliance problem."],
+        verify: ["defensible", "Only if counseling happened off the recording, which is unlikely here."],
+        correct: ["not", "There is no source to correct it against. If it did not happen, remove it."],
+        keep: ["not", "No source supports this. Signing it documents counseling that did not occur."] } }
+  },
+  options: [
+    { key: "keep", label: "Keep as written" },
+    { key: "verify", label: "Keep after I verify it myself" },
+    { key: "correct", label: "Correct it to match the source" },
+    { key: "remove", label: "Remove it" }
+  ],
+  consequence: { when: { stmt: "S2", decisions: ["keep", null] }, title: "Two weeks later", text: "A portal message from Ms. Walker: the chest tightness now comes on walking from the parking lot. The signed note in her chart says she denied chest pain at her last visit.", caveat: "One plausible outcome in this scenario, not a certainty. Other safeguards might have caught it." },
+  role: "You are the clinician who just saw Denise Walker. Your clinic started using an ambient AI scribe this month. It listened to the visit and drafted your note, which is now waiting for your signature. Signing it means you attest that it is accurate.",
+  task: "Before you sign, check each statement against what was actually said and what is in the chart. Correct or remove anything that is wrong, then sign.",
+  reflectMC: [
+    { id: "A1", prompt: "Which error mattered most clinically?", options: [
+      { text: "S2: Patient denies chest pain.", v: "accepted", fb: "Right. It reversed the symptom that drove the plan for the visit." },
+      { text: "S3: Taking lisinopril as prescribed.", v: "partial", fb: "Important for the medication plan, but the missed chest symptom carries more risk." },
+      { text: "S9: Counseled on low-sodium diet.", v: "partial", fb: "A real documentation and compliance problem, but it does not change the patient's care." },
+      { text: "S6: Normal lung and heart exam.", v: "partial", fb: "Unsourced, but the signer can verify it from their own exam." } ] },
+    { id: "A2", multi: true, prompt: "Which kinds of statements needed the closest checking? Select all that apply.", options: [
+      { text: "Negations, such as \"denies\"", v: "accepted" },
+      { text: "Exam findings no one said aloud", v: "accepted" },
+      { text: "Plans and medication changes", v: "accepted" },
+      { text: "Details the chart may have supplied, such as doses", v: "accepted" },
+      { text: "Statements that match the transcript word for word", v: "not" } ],
+      fb: "The first four are where drafts most often go wrong. A statement that matches the transcript still deserves a glance, but it carries the least risk." }
+  ],
+  reflect: [
+    "Which statement was hardest to classify, and why?",
+    "Which error mattered most clinically, and what would have happened if it had been signed?"
+  ],
+  goingFurther: { q: "How would you change the review workflow so errors like these are caught, and how would you know it worked?", example: "Example answer: require source review of negations and the plan before signing. Measure: contradicted statements found per 100 audited signed notes. Balancing measure: review minutes per note." },
+  expertNote: "HPI: 3 weeks of exertional chest tightness climbing stairs, relieved by rest within 1 to 2 minutes. Stopped lisinopril about 1 month ago because of cough. Takes metformin twice daily. Father with MI at 60. BP 152/94. Plan: EKG today; change antihypertensive given ACE inhibitor cough; further evaluation of exertional symptoms.",
+  expertNoteAfter: "Exam findings stay only if the signer performed and recalls them. Diet counseling is removed.",
+  checklist: [
+    "Traced every statement to a transcript line or another named source",
+    "Corrected each contradiction",
+    "Kept exam findings only if personally verified",
+    "Matched the plan to what was discussed",
+    "Removed counseling that did not occur",
+    "Named the most clinically important error"
+  ],
+  debrief: [
+    "Fluent is not the same as accurate. A negation such as \"denies\" can reverse the key finding while still citing the right lines.",
+    "Drafts can fill template defaults, such as a normal exam or routine counseling, that no one said.",
+    "Some statements come from the chart rather than the conversation. A stale chart list can leak into a fresh note.",
+    "The signer is responsible for the note. Ambient tools move work from writing to verifying, and that verification burden is work to design for."
+  ]
+},
+{
+  id: "ambient-verify-hard",
+  version: "0.1",
+  reviewStatus: "draft",
+  mode: "hard",
+  citations: "find",
+  shortTitle: "Ambient AI note verification",
+  modeLabel: "Hard · find the sources yourself",
+  objective: "Verify a longer AI-drafted note without citations: find the transcript or chart line behind each statement, catch subtle errors, and decide what you would sign.",
+  patient: { name: "Gloria Mendez", age: 74, sex: "F", mrn: "SIM-1177", context: "Clinic follow-up with daughter · hypertension, chronic itch", synthetic: true },
+  role: "You just finished a visit with Gloria Mendez and her daughter. The ambient AI scribe drafted your note, but this version shows no citations. The note is waiting for your signature, and signing it means you attest that it is accurate.",
+  task: "For each statement, find and click the line it rests on, or mark that no line supports it. Then decide what to keep, correct, or remove, and sign.",
+  transcript: [
+    { id: "T1", who: "Clinician", text: "Good to see you both. Ms. Mendez, how have things been since we started the water pill?" },
+    { id: "T2", who: "Patient", text: "Mostly fine. I'm up at night to use the bathroom more, but that's okay." },
+    { id: "T3", who: "Daughter", text: "Tell her about the dizziness, Mom." },
+    { id: "T4", who: "Patient", text: "Oh, right. I get a little dizzy when I stand up too fast." },
+    { id: "T5", who: "Clinician", text: "How long has that been going on?" },
+    { id: "T6", who: "Patient", text: "Two weeks? No, wait. It started around my birthday, so more like six weeks." },
+    { id: "T7", who: "Clinician", text: "Does it pass if you sit back down?" },
+    { id: "T8", who: "Patient", text: "Yes, after a few seconds." },
+    { id: "T9", who: "Clinician", text: "Any falls?" },
+    { id: "T10", who: "Patient", text: "No, no falls." },
+    { id: "T11", who: "Daughter", text: "Mom, you fell in the kitchen last month. I found you on the floor." },
+    { id: "T12", who: "Patient", text: "I slipped. That's different." },
+    { id: "T13", who: "Clinician", text: "Did you hit your head or pass out?" },
+    { id: "T14", who: "Patient", text: "No. I just bruised my hip a little." },
+    { id: "T15", who: "Clinician", text: "Any chest pain, shortness of breath, or heart racing?" },
+    { id: "T16", who: "Patient", text: "No, none of that." },
+    { id: "T17", who: "Clinician", text: "How's the itching you mentioned last time?" },
+    { id: "T18", who: "Patient", text: "Still there at night. The hydroxyzine helps me sleep through it." },
+    { id: "T19", who: "Clinician", text: "Are you taking it every night?" },
+    { id: "T20", who: "Patient", text: "Most nights. Maybe five nights a week." },
+    { id: "T21", who: "Daughter", text: "She's also been taking my melatonin some nights." },
+    { id: "T22", who: "Clinician", text: "Okay. Hydroxyzine can make dizziness worse in some people, so let's keep that in mind." },
+    { id: "T23", who: "Patient", text: "My granddaughter's soccer team made the playoffs, by the way." },
+    { id: "T24", who: "Clinician", text: "That's wonderful. What position does she play?" },
+    { id: "T25", who: "Patient", text: "Goalie, like her mother." },
+    { id: "T26", who: "Daughter", text: "I was a terrible goalie." },
+    { id: "T27", who: "Clinician", text: "Let me check your blood pressure. It's 168 over 96." },
+    { id: "T28", who: "Clinician", text: "Let's have you rest a few minutes and I'll recheck." },
+    { id: "T29", who: "Clinician", text: "Okay, the repeat is 148 over 88." },
+    { id: "T30", who: "Clinician", text: "Let me listen to your heart and lungs, and take a look at your legs." },
+    { id: "T31", who: "Clinician", text: "Your ankles have a little swelling, about the same as last time." },
+    { id: "T32", who: "Clinician", text: "Your last cholesterol was high. I'd recommend starting a statin to lower your heart attack and stroke risk." },
+    { id: "T33", who: "Patient", text: "I don't want another pill. I'm already taking so many." },
+    { id: "T34", who: "Clinician", text: "That's fair. We can talk about it again next visit." },
+    { id: "T35", who: "Clinician", text: "I'll check your kidney function and potassium today since you're on the water pill." },
+    { id: "T36", who: "Clinician", text: "If the potassium comes back low, we'd start a potassium supplement." },
+    { id: "T37", who: "Clinician", text: "For the dizziness, stand up slowly, and let's cut the hydroxyzine to only when you really need it." },
+    { id: "T38", who: "Daughter", text: "Should she keep taking the melatonin?" },
+    { id: "T39", who: "Clinician", text: "Melatonin is fine for now." },
+    { id: "T40", who: "Clinician", text: "Let's follow up in four weeks, sooner if she falls again." },
+    { id: "T41", who: "Patient", text: "Okay. Thank you, doctor." }
+  ],
+  chart: {
+    meds: [
+      { id: "C1", name: "Hydrochlorothiazide 25 mg by mouth daily", meta: "Started at last visit · entered by PCP" },
+      { id: "C2", name: "Hydroxyzine 25 mg by mouth at bedtime", meta: "Entered 8 months ago · marked reviewed at 3 later visits" }
+    ],
+    vitals: [
+      { id: "VS1", name: "BP 168/96 mmHg", meta: "Today, clinic intake" },
+      { id: "VS2", name: "HR 76 · SpO2 97% on room air", meta: "Today, clinic intake" }
+    ]
+  },
+  sections: [
+    { name: "History of present illness", stmts: ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"] },
+    { name: "Medications", stmts: ["S9"] },
+    { name: "Vitals", stmts: ["S10"] },
+    { name: "Exam", stmts: ["S11", "S12"] },
+    { name: "Assessment", stmts: ["S13", "S14"] },
+    { name: "Plan", stmts: ["S15", "S16", "S17", "S18", "S19", "S20"] }
+  ],
+  statements: {
+    S1: { text: "74-year-old woman presents for follow-up after starting a diuretic for hypertension.",
+      links: [{ kind: "transcript", ids: ["T1"] }], alsoOk: ["C1"], reference: "keep", fb: OK("T1 confirms a follow-up after starting the water pill.") },
+    S2: { text: "Reports more nighttime urination since starting the diuretic.",
+      links: [{ kind: "transcript", ids: ["T2"] }], reference: "keep", fb: OK("Matches T2.") },
+    S3: { text: "Lightheaded on standing for the past 2 weeks, resolving within seconds of sitting.",
+      links: [{ kind: "transcript", ids: ["T6"] }], alsoOk: ["T4", "T5", "T7", "T8"], reference: "correct", error: true,
+      refText: "Lightheaded on standing for about 6 weeks, resolving within seconds of sitting.",
+      fb: {
+        correct: ["accepted", "She corrected herself in T6: about six weeks, since her birthday. Drafts often keep the first number spoken."],
+        remove: ["partial", "Removes the wrong duration, but also the symptom that drives today's plan."],
+        verify: ["not", "T6 already settles the duration."],
+        keep: ["not", "The patient revised 2 weeks to about 6 weeks in T6. Duration shapes how you weigh possible causes."] } },
+    S4: { text: "Patient reports a fall in the kitchen last month.",
+      links: [{ kind: "transcript", ids: ["T10", "T11"] }], alsoOk: ["T9", "T12"], reference: "correct", error: true,
+      refText: "Patient denies falls. Daughter reports a kitchen fall last month, which the patient describes as a slip.",
+      fb: {
+        correct: ["accepted", "The patient denied falls (T10). Her daughter reported the fall (T11). Who said it matters, and the disagreement itself is clinically useful."],
+        remove: ["not", "The fall is real history from a witness. Removing it hides fall risk in a 74-year-old."],
+        verify: ["not", "The facts are close but the attribution is wrong, and T10 and T11 already settle it."],
+        keep: ["not", "The patient said she had no falls. Her daughter said she did. The draft merged two speakers into one."] } },
+    S5: { text: "No head strike or loss of consciousness. Bruised hip.",
+      links: [{ kind: "transcript", ids: ["T14"] }], alsoOk: ["T13"], reference: "keep", fb: OK("T13 and T14 support it.") },
+    S6: { text: "Denies chest pain, shortness of breath, or palpitations.",
+      links: [{ kind: "transcript", ids: ["T16"] }], alsoOk: ["T15"], reference: "keep", fb: OK("T15 and T16 support it. Not every negation is an error.") },
+    S7: { text: "Nighttime itching. Taking hydralazine about 5 nights per week.",
+      links: [{ kind: "transcript", ids: ["T18"] }], alsoOk: ["T17", "T19", "T20", "C2"], reference: "correct", error: true,
+      refText: "Nighttime itching. Taking hydroxyzine about 5 nights per week.",
+      fb: {
+        correct: ["accepted", "She takes hydroxyzine (T18), an antihistamine. Hydralazine is a blood pressure drug. Sound-alike names are a known transcription hazard."],
+        remove: ["partial", "Removes the wrong drug, but hydroxyzine use is central to today's dizziness plan."],
+        verify: ["not", "T18 already names the drug. Read it letter by letter."],
+        keep: ["not", "Hydralazine is not hydroxyzine. A wrong drug name can spread into the medication list."] } },
+    S8: { text: "Also takes melatonin some nights, per daughter.",
+      links: [{ kind: "transcript", ids: ["T21"] }], reference: "keep", fb: OK("T21 supports it, and the draft attributed it to the daughter correctly.") },
+    S9: { text: "Hydrochlorothiazide 25 mg daily.",
+      links: [{ kind: "chart", tab: "meds", ids: ["C1"], label: "Medication list", detail: "Hydrochlorothiazide 25 mg daily" }], alsoOk: ["T1", "T35"], reference: "keep",
+      fb: OK("The medication list supports the drug and dose. In the visit it was only called the water pill.") },
+    S10: { text: "BP 168/96, repeat 148/88 after rest.",
+      links: [{ kind: "transcript", ids: ["T27", "T29"] }], alsoOk: ["T28", "VS1"], reference: "keep", fb: OK("T27 and T29 support both readings.") },
+    S11: { text: "Mild bilateral ankle edema, unchanged from last visit.",
+      links: [{ kind: "transcript", ids: ["T31"] }], alsoOk: ["T30"], reference: "keep", fb: OK("T31 supports it.") },
+    S12: { text: "Lungs clear to auscultation. Heart regular rate and rhythm.",
+      links: [], alsoOk: ["T30"], noLinkNote: "T30 shows the exam happened, but only the ankle finding was spoken.", reference: "verify",
+      fb: {
+        verify: ["accepted", "The right approach. The exam happened (T30), but only the ankle finding was said aloud. Keep these only if you examined and recall them."],
+        correct: ["defensible", "Fine if you edit the findings to what you actually found."],
+        remove: ["defensible", "Safe if you cannot recall the findings."],
+        keep: ["not", "No line supports these findings. Signing them unchecked attests to details the note cannot support."] } },
+    S13: { text: "Hypertension, at goal on current regimen.",
+      links: [{ kind: "transcript", ids: ["T29"] }], alsoOk: ["T27", "VS1"], reference: "correct", error: true,
+      refText: "Hypertension. Repeat BP 148/88 after rest.",
+      fb: {
+        correct: ["accepted", "No one said at goal, and 148/88 on repeat is above common treatment targets. The draft added a judgment the clinician never made."],
+        remove: ["partial", "Removes the false judgment but drops the diagnosis from the assessment."],
+        verify: ["not", "There is nothing to verify. Nobody said it."],
+        keep: ["not", "A judgment no one made. The next reader may leave therapy unchanged because of it."] } },
+    S14: { text: "Orthostatic symptoms, possibly worsened by hydroxyzine.",
+      links: [{ kind: "transcript", ids: ["T22"] }], alsoOk: ["T4", "T8", "T37"], reference: "keep",
+      fb: OK("T22 supports the hydroxyzine link, and orthostatic is a fair summary of T4 and T8.") },
+    S15: { text: "Basic metabolic panel today for kidney function and potassium.",
+      links: [{ kind: "transcript", ids: ["T35"] }], reference: "keep", fb: OK("T35 supports it.") },
+    S16: { text: "Started potassium chloride supplement.",
+      links: [{ kind: "transcript", ids: ["T36"] }], alsoOk: ["T35"], reference: "correct", error: true,
+      refText: "Start potassium supplement only if potassium returns low.",
+      fb: {
+        correct: ["accepted", "T36 is conditional: only if potassium is low. The draft turned a contingency plan into an action."],
+        remove: ["defensible", "Acceptable, though the conditional plan helps whoever follows up the lab."],
+        verify: ["not", "T36 already settles it. Nothing was started."],
+        keep: ["not", "Nothing was started. A supplement taken with normal potassium can push it too high."] } },
+    S17: { text: "Started atorvastatin 20 mg daily for hyperlipidemia.",
+      links: [{ kind: "transcript", ids: ["T33"] }], alsoOk: ["T32", "T34"], reference: "correct", error: true,
+      refText: "Statin recommended for elevated cholesterol. Patient declined; revisit next visit.",
+      fb: {
+        correct: ["accepted", "Recommended in T32, declined in T33. The draft recorded a recommendation as an order and supplied a dose no one said."],
+        remove: ["partial", "Removes the false order but loses the documented shared decision."],
+        verify: ["not", "T33 already settles it."],
+        keep: ["not", "She declined. A signed note saying she started it can lead to a prescription she refused."] } },
+    S18: { text: "Reduce hydroxyzine to as needed. Rise slowly from sitting.",
+      links: [{ kind: "transcript", ids: ["T37"] }], reference: "keep", fb: OK("T37 supports both.") },
+    S19: { text: "Continue melatonin.",
+      links: [{ kind: "transcript", ids: ["T39"] }], alsoOk: ["T38"], reference: "keep", fb: OK("T39 supports it.") },
+    S20: { text: "Follow up in 4 weeks, sooner if she falls again.",
+      links: [{ kind: "transcript", ids: ["T40"] }], reference: "keep", fb: OK("T40 supports it.") }
+  },
+  consequence: { when: { stmt: "S16", decisions: ["keep", null] }, title: "Three days later", text: "Her potassium returned at 4.6 mmol/L, in the normal range. The signed plan says a supplement was started, and the after-visit summary told her to take it daily.", caveat: "One plausible outcome in this scenario, not a certainty. A pharmacist or a later reviewer might have caught it." },
+  reflect: [
+    "At what point did you start trusting statements without checking them?",
+    "Which kind of error was hardest to catch: wrong speaker, self-correction, plan versus action, sound-alike drug, or added judgment?"
+  ],
+  goingFurther: { q: "If careful review of a 20-line note takes this long, what would make verification cheaper without making it less safe?", example: "Example answer: have the tool show its evidence for high-risk content only (negations, medication names, plans, and attributions), so review time goes where errors cluster. Measure caught errors per audited note and minutes per note together." },
+  expertNote: "HPI: 74-year-old woman on a new diuretic for hypertension. About 6 weeks of lightheadedness on standing, resolving within seconds of sitting. Denies falls; daughter reports a kitchen fall last month, which the patient describes as a slip, with a bruised hip and no head strike or loss of consciousness. Nighttime itching; takes hydroxyzine about 5 nights per week and occasional melatonin. BP 168/96, repeat 148/88. Plan: BMP today; start potassium only if low; hydroxyzine as needed; rise slowly; statin recommended and declined, revisit next visit; follow up in 4 weeks.",
+  expertNoteAfter: "Heart and lung findings stay only if the signer examined and recalls them.",
+  checklist: [
+    "Found the line that settles each statement before deciding",
+    "Checked who said it, patient or family",
+    "Caught where someone corrected themselves",
+    "Separated what was planned or offered from what was done",
+    "Read drug names letter by letter",
+    "Removed judgments no one made"
+  ],
+  debrief: [
+    "Who said it matters. A family member's report is useful history, but it is not the patient's report.",
+    "Real speech is messy. Self-corrections, conditional plans, and declined offers get flattened into clean facts.",
+    "Sound-alike drug names are easy to miss because the sentence still reads naturally.",
+    "Added judgments such as \"at goal\" read like clinical reasoning, but no one made them.",
+    "Most of this note was accurate. Long runs of correct lines wear down attention, and that is the verification burden: the errors hide among the lines you stop checking."
+  ]
+}
+];
+const COMING = [{ title: "Medication reconciliation", sub: "Stale anticoagulant entry versus outside pharmacy fills. In development." }];
+
+/* ============ WORKFLOW LAB (content) ============ */
+const LAB = {
+  id: "unassigned-result",
+  version: "0.5",
+  reviewStatus: "draft",
+  title: "The unassigned result",
+  modeLabel: "Workflow lab · investigate, redesign, replay",
+  objective: "Investigate a missed follow-up, change the rules that allowed it, and test whether your fix works without overloading anyone.",
+  role: "You sit on your hospital's patient safety and clinical informatics committee. A missed follow-up has been reported, and the committee wants to know how it happened and what rule to change.",
+  patient: { name: "Robert Hale", age: 67, sex: "M", mrn: "SIM-2290", context: "Admitted 3 days for pneumonia · former smoker" },
+  brief: [
+    "Fourteen months after a 3-day admission for pneumonia, Mr. Hale returned with hemoptysis. A new CT showed a 2.4 cm mass in his left upper lobe.",
+    "A follow-up recommended during that admission was never arranged. The result was delivered and acknowledged.",
+    "You have been asked to find out what happened."
+  ],
+  states: [
+    { id: "ordered", label: "Ordered" },
+    { id: "pending", label: "Flagged as pending at discharge" },
+    { id: "final", label: "Finalized" },
+    { id: "delivered", label: "Delivered" },
+    { id: "seen", label: "Acknowledged" },
+    { id: "owned", label: "Responsibility accepted" },
+    { id: "resolved", label: "Disposition documented" }
+  ],
+  afterState: "Follow-up completed",
+  events: [
+    { id: "E1", when: "Day 1 · 02:10", actor: "Dr. Okafor, night admitting resident", title: "CT chest ordered",
+      detail: "Ordered overnight to look for an empyema behind a right lower lobe pneumonia.",
+      prov: [["Source", "Order record"], ["Ordering provider", "Dr. Okafor (PGY-1, night float)"], ["Result routing", "Default rule: results go to the ordering provider"]], states: ["ordered"] },
+    { id: "E2", when: "Day 1 · 03:30", actor: "Overnight teleradiology", title: "Preliminary read posted",
+      detail: "\"Right lower lobe consolidation. No empyema.\" The study status changes from ordered to resulted.",
+      prov: [["Source", "Radiology system"], ["Report status", "Preliminary"], ["Order status after posting", "Resulted"], ["Lung nodule mentioned", "No"]], states: [] },
+    { id: "E3", when: "Day 3 · 14:00", actor: "Dr. Reyes, discharging attending", title: "Patient discharged",
+      detail: "The discharge summary's pending results section reads \"None.\" The section is filled automatically from orders that have no result, and the CT already had a preliminary one.",
+      prov: [["Source", "Discharge summary template"], ["Pending results section", "Auto-filled: None"], ["Logic", "Lists orders with status Ordered only"], ["CT status at discharge", "Resulted (preliminary)"]], states: [] },
+    { id: "E4", when: "Day 4 · 09:40", actor: "Staff radiologist", title: "Final read issued after discharge",
+      detail: "\"Right lower lobe pneumonia. Incidental 8 mm solid nodule in the left upper lobe. Recommend follow-up chest CT in 6 to 12 months.\" The nodule is not a critical result under hospital policy, so no phone call is required.",
+      prov: [["Source", "Radiology system"], ["Report status", "Final (supersedes preliminary)"], ["Communication category", "Non-critical, electronic routing"], ["Recommendation", "Last line of the impression"]], states: ["final"] },
+    { id: "E5", when: "Day 4 · 09:41", actor: "EHR routing rule", title: "Result routed to the ordering resident",
+      detail: "The final report lands in Dr. Okafor's results inbox. Dr. Okafor started an ICU rotation that morning and no longer cares for Mr. Hale.",
+      prov: [["Source", "Inbox routing log"], ["Recipient", "Dr. Okafor (ordering provider)"], ["Recipient's current service", "Medical ICU"], ["Copies sent", "None"]], states: ["delivered"] },
+    { id: "E6", when: "Day 6 · 23:15", actor: "Dr. Okafor", title: "Result acknowledged",
+      detail: "During a busy ICU night, Dr. Okafor clears the results inbox. The report is open for 6 seconds before Acknowledge is clicked. The task closes.",
+      prov: [["Source", "Audit log"], ["Action", "Acknowledge"], ["Time report was open", "6 seconds"], ["Task status after action", "Closed"], ["Orders or messages created", "None"]], states: ["seen"] },
+    { id: "E7", when: "Day 8", actor: "Dr. Kim, primary care, outside the network", title: "PCP receives the discharge summary",
+      detail: "Dr. Kim's office receives the discharge summary by fax. It lists no pending results. Dr. Kim cannot see the hospital's radiology reports.",
+      prov: [["Source", "Fax log and discharge summary"], ["Pending results listed", "None"], ["PCP access to hospital results", "No"]], states: [] },
+    { id: "E8", when: "Month 14", actor: "Emergency department", title: "Mass found",
+      detail: "Mr. Hale presents with hemoptysis. CT shows a 2.4 cm left upper lobe mass at the site of the earlier nodule. A safety report is filed.",
+      prov: [["Source", "ED note and safety report"], ["Prior report with recommendation", "Day 4 final read"], ["Follow-up imaging on record", "None"]], states: [] }
+  ],
+  minOpenForQuestions: 6,
+  central: { id: "Q0", prompt: "Where did the process first lose a reliable path to follow-up?",
+    options: [
+      { key: "discharge", text: "At discharge, when the preliminary read kept the CT off the pending list.", v: "accepted", cites: ["E2", "E3"], fb: "This is the earliest break. Once the CT looked complete, nothing told anyone a final read was still coming." },
+      { key: "routing", text: "At routing, when the final read went to a resident who had left the service.", v: "accepted", cites: ["E5", "E1"], fb: "Also defensible. This is where the result reached a resident no longer caring for the patient, with no handoff. The discharge summary had already dropped it a day earlier." },
+      { key: "ack", text: "At acknowledgment, when the task closed without a plan.", v: "partial", cites: ["E6"], fb: "A real failure, but the path was already unreliable before this. The acknowledgment closed a task that had gone to the wrong person." },
+      { key: "pcp", text: "At the PCP, when the summary said nothing was pending.", v: "partial", cites: ["E7", "E3"], fb: "A consequence of the discharge summary rather than the first break." },
+      { key: "ed", text: "In the emergency department, 14 months later.", v: "not", cites: ["E8"], fb: "That is when the failure surfaced, not where it began." }
+    ] },
+  questions: [
+    { id: "Q2", prompt: "When the final read arrived, what does the record show about responsibility for it?",
+      evidence: { must: ["E5"], anyOf: ["E1", "E7"] },
+      options: [
+        { key: "a", text: "The ordering resident was clearly responsible and simply ignored it.", v: "partial", fb: "The routing rule sent it to him, but he had moved to the ICU and nothing handed the follow-up to him explicitly. The record shows a deferral, not a refusal." },
+        { key: "b", text: "The discharging attending had accepted it.", v: "not", fb: "The attending discharged the patient but was never sent the final read." },
+        { key: "c", text: "The primary care physician had been told to follow up.", v: "not", fb: "The PCP received a summary saying nothing was pending and could not see the report." },
+        { key: "d", text: "It was routed to the ordering resident, but no handoff confirmed who would follow up.", v: "accepted", fb: "Right. The record shows routing and an acknowledgment. It does not show that anyone accepted the follow-up as theirs." }
+      ] },
+    { id: "Q3", prompt: "What does the acknowledgment record establish?",
+      evidence: { must: ["E6"], anyOf: ["E7", "E8"] },
+      options: [
+        { key: "a", text: "That the resident understood the result.", v: "not", fb: "An audit entry shows a click after 6 seconds. It cannot show what he read or understood." },
+        { key: "b", text: "That an acknowledgment was recorded and the task closed, with no plan attached.", v: "accepted", fb: "The record proves a click and a closed task. No order, message, or plan followed." },
+        { key: "c", text: "That the PCP was notified.", v: "not", fb: "Acknowledging sends nothing onward." }
+      ] }
+  ],
+  levers: [
+    { key: "capture", finding: "The CT was never flagged as pending", q: "At discharge, which results count as pending?",
+      why: "The preliminary read made the CT look complete, so the discharge summary told everyone nothing was pending.",
+      evidence: "In Dalal et al.'s 2018 trial, only about half of actionable pending results were listed in the discharge summary. Darragh et al. list templates that capture pending results among the approaches that show promise.",
+      options: [
+        { key: "auto", short: "No-result orders only", label: "Only orders with no result at all", current: true, work: 0, workText: "",
+          pros: ["No extra work at discharge"], cons: ["Studies with a preliminary read look complete and drop off the pending list"] },
+        { key: "flagged", short: "Include preliminary reads", label: "Also studies with only a preliminary read, confirmed by the discharging clinician", work: 1,
+          workText: "Discharging clinicians confirm the pending list at each discharge: about 40 a week, a minute or two each.",
+          pros: ["The PCP learns a result is still coming", "Gives the team a test to annotate"], cons: ["Adds a confirmation step at every discharge"] }
+      ] },
+    { key: "owner", finding: "No handoff confirmed who would follow up", q: "Who is responsible for a result that finalizes after discharge?",
+      why: "The routing rule sent the final read to a resident who had already left the service.",
+      evidence: "Dalal et al. assigned responsibility to the discharging attending and copied network PCPs. Time to documented action fell from 14 to 9 days, but the share of results with documented action did not change significantly (60.7% vs 56.3%).",
+      options: [
+        { key: "ordering", short: "Ordering clinician", label: "The ordering clinician", current: true, work: 0,
+          workText: "Residents receive about 120 results a week for patients they may no longer care for.",
+          pros: ["No configuration change"], cons: ["Residents rotate, so results reach people no longer caring for the patient"] },
+        { key: "attending", short: "Discharging attending", label: "The discharging attending", work: 1,
+          workText: "Discharging attendings receive about 120 results a week, around 12 each.",
+          pros: ["Reaches someone who knew the patient"], cons: ["Attendings rotate off service and take vacations"] },
+        { key: "shared", short: "Attending + PCP copy", label: "The discharging attending, with the PCP copied (by fax if outside the network)", work: 1,
+          workText: "Discharging attendings receive about 120 results a week; PCP offices receive about 120 faxed copies a week across many practices.",
+          pros: ["Two chances to notice", "Closest to a published intervention"], cons: ["Each recipient can assume the other will act"] },
+        { key: "team", short: "Results follow-up team", label: "A nurse-led results follow-up team", work: 3,
+          workText: "The results team works about 120 queue items a week, with a physician on results duty for clinical questions.",
+          pros: ["A role whose job is follow-up", "Unaffected by rotations and vacations"], cons: ["Needs funded staff", "The team lacks clinical context unless it is handed over"] }
+      ] },
+    { key: "closure", finding: "An acknowledgment was treated as done", q: "What closes the follow-up task?",
+      why: "Acknowledging the result closed the task with no plan.",
+      evidence: "In the same trial, about 40% of actionable results had no documented follow-up at all.",
+      options: [
+        { key: "ack", short: "Acknowledgment", label: "Acknowledging the result", current: true, work: 0, workText: "",
+          pros: ["Fast and low burden"], cons: ["Seen counts as done, and deferred work disappears"] },
+        { key: "disposition", short: "Documented disposition", label: "A documented disposition: follow-up arranged, patient and PCP notified, or no action needed with a reason", work: 2,
+          workText: "Every result needs a documented decision; most are quick no-action entries.",
+          pros: ["A task cannot close without a plan"], cons: ["Every result needs a documented decision", "Open tasks can stall when the assigned clinician is away"] }
+      ] },
+    { key: "net", finding: "Nothing caught it for 14 months", q: "What catches a result that slips through?",
+      why: "Once the task closed, no process ever looked at it again.",
+      evidence: "Dalal et al. describe a radiology system that escalates unacknowledged findings to the attending, and call for tools that find results where no action was taken.",
+      options: [
+        { key: "none", short: "Nothing", label: "Nothing", current: true, work: 0, workText: "",
+          pros: ["No extra work"], cons: ["Nothing catches what slips through"] },
+        { key: "reassign", short: "Reassign after 3 days", label: "Reassign any task open more than 3 days to the covering hospitalist", work: 1,
+          workText: "Covering hospitalists pick up a few stalled tasks a week.",
+          pros: ["Moves stalled tasks to someone available, like the escalation in a published radiology system"], cons: ["Only helps tasks that are still open"] },
+        { key: "audit", short: "Weekly audit", label: "A weekly report of results with a follow-up recommendation and neither a follow-up order nor a documented decision that none is needed", work: 2,
+          workText: "Quality staff review a weekly report and chase what it finds.",
+          pros: ["Catches results closed without a plan, and skips documented no-action decisions"], cons: ["Weekly, so slower than direct assignment", "Needs someone assigned to review the report"] }
+      ] },
+    { key: "context", finding: "The reason for the test was lost", q: "What travels with the result?",
+      why: "Whoever received the final read had to work out on their own why it was ordered and what to do about it.",
+      evidence: "Liao et al. found attendings and PCPs agreed on which pending results needed action for 72.5% of patients. Dalal et al.'s system let attendings reply with clinical context.",
+      options: [
+        { key: "bare", short: "Result only", label: "The result only", current: true, work: 0, workText: "",
+          pros: ["No extra documentation"], cons: ["Recipients must reconstruct why the test was ordered"] },
+        { key: "context", short: "Result + reason + next step", label: "The result, plus the team's reason for the test and what to do if it is abnormal", work: 1,
+          workText: "Discharging teams write a reason and a suggested action for each pending test: a few minutes per discharge.",
+          pros: ["Recipients know why it was ordered and what to do"], cons: ["Only works for tests flagged as pending", "Adds a few minutes per discharge"] }
+      ] }
+  ],
+  volumeNote: "Volumes are illustrative for a mid-size medicine service: about 40 discharges a week leave with pending results, about 120 results finalize after discharge, and about 9 of those need action. Published studies suggest fewer than 1 in 10 pending results are actionable.",
+  assumptions: [
+    { basis: "literature", text: "Assigning responsibility and notifying the attending can speed documented action without raising the share of results that get any (Dalal et al., 2018)." },
+    { basis: "literature", text: "Copying the PCP helped most when the PCP was inside the hospital network (Dalal et al., 2018)." },
+    { basis: "literature", text: "Inpatient and outpatient clinicians often disagree about which pending results need action (Liao et al., 2014)." },
+    { basis: "literature", text: "Escalating unacknowledged findings to an attending is a published design (described in Dalal et al., 2018)." },
+    { basis: "scenario", text: "In the base scenario, Dr. Reyes reads results on Day 4 between clinic patients and can act the next morning. In the stress test she is on vacation Days 4 to 12." },
+    { basis: "scenario", text: "Dr. Okafor is in the ICU and no longer caring for Mr. Hale. Without a handoff that makes the follow-up his, he defers it. In the stress test he is on vacation until Day 11." },
+    { basis: "scenario", text: "Under acknowledgment closure, anyone who cannot act on the spot defers, and the closed task drops out of view." },
+    { basis: "scenario", text: "A rule only changes what the system shows and to whom. Someone acts only when they have accepted the task, are available, and have a prompt: an open task, a note, an audit, or a reassignment." },
+    { basis: "scenario", text: "Copying a clinician creates awareness, not accepted responsibility." },
+    { basis: "scenario", text: "Two recipients without clear responsibility each assume the other will act." },
+    { basis: "scenario", text: "The results team works weekdays. In the stress test its nurse is out Days 5 to 9 with no backup. Without context, the nurse finds the recommendation only when a disposition forces a full read." },
+    { basis: "scenario", text: "Context can only be attached to tests flagged as pending at discharge." },
+    { basis: "scenario", text: "An outside PCP acts on a pending CT only if the summary lists it and says what to do if it is abnormal." },
+    { basis: "scenario", text: "Reassignment moves only open tasks. The weekly audit runs on Day 9." },
+    { basis: "scenario", text: "The replay stops at a documented disposition. Whether the scan actually happens months later is outside it." }
+  ],
+  stress: {
+    title: "Stress test: the responsible clinician is away",
+    text: "Keep your design. This time, whoever it makes responsible is unavailable when the result finalizes: Dr. Reyes is on vacation until Day 13, the results nurse is out Days 5 to 9 with no backup, and Dr. Okafor is on vacation until Day 11."
+  },
+  residualGap: "Unless you change which results count as pending, the discharge summary still tells Dr. Kim nothing is pending, because the preliminary read made the CT look complete. Fixing routing does not fix what the summary says.",
+  reflect: [
+    "Which configuration would you choose for this hospital, and what would you need to make it work?",
+    "What would you measure to know your redesign worked, and what balancing measure would catch the work it creates?"
+  ],
+  reasons: [
+    "Fixes the earliest break in the process",
+    "Sends the result to someone who knows the patient",
+    "Keeps working when someone is away",
+    "Uses staff and tools the hospital already has",
+    "Keeps added work low",
+    "Follows the published evidence"
+  ],
+  reflectMC: [
+    { id: "R1", prompt: "Which statement best separates an acknowledgment from accepted responsibility?", options: [
+      { text: "An acknowledgment records a click. Accepted responsibility means someone has taken the follow-up as theirs to finish.", v: "accepted", fb: "Right. An audit log can prove the first. Only a person's action or an explicit handoff proves the second." },
+      { text: "They are the same. Acknowledging a result means accepting it.", v: "not", fb: "In the incident, a resident acknowledged the result and no one ever took on the follow-up." },
+      { text: "Responsibility is accepted when the result reaches someone's inbox.", v: "not", fb: "Delivery picks a destination. It does not mean anyone agreed to act." } ] },
+    { id: "R2", prompt: "In your replays, what actually produced a documented disposition?", options: [
+      { text: "A rule kept the task in front of someone with the information and the role, and that person acted.", v: "accepted", fb: "Right. Each successful replay names who received the task, who accepted it, and what prompted them." },
+      { text: "Changing a setting made clinicians act.", v: "not", fb: "Settings change what the system shows and to whom. People still decide to act; the replay shows who did and why." },
+      { text: "Notifying more people.", v: "partial", fb: "More notifications raise awareness, but in these replays a copy alone never produced a disposition." } ] },
+    { id: "R3", multi: true, prompt: "Suppose your best design documented a disposition. What could still fail? Select all that apply.", options: [
+      { text: "The scan is ordered but never scheduled.", v: "accepted" },
+      { text: "The patient never receives or understands the plan.", v: "accepted" },
+      { text: "The responsible clinician is away when the result arrives.", v: "accepted" },
+      { text: "A different result needs action within hours, not days.", v: "accepted" },
+      { text: "Nothing. A documented disposition guarantees the follow-up.", v: "not" } ],
+      fb: "Every option except the last can still fail. A disposition records a decision; completing the follow-up is a separate step the replay does not show." }
+  ],
+  publishedReasons: [
+    "Most patients had PCPs outside the network, and those PCPs were not emailed.",
+    "Follow-up documented outside the hospital's records could not be seen or counted.",
+    "Clinicians often disagree about which results need action.",
+    "A notification creates awareness; it does not complete a handoff.",
+    "Busy inboxes make deferral easy, and deferred items get lost."
+  ],
+  goingFurther: { q: "Write one measure and one balancing measure for your design.", example: "Example answer. Measure: share of actionable results finalized after discharge with a documented disposition within 7 days. Balancing measures: open result tasks per clinician, and median days a task stays open." },
+  research: [
+    { cite: "Roy et al., 2005 · Annals of Internal Medicine", doi: "10.7326/0003-4819-143-2-200507190-00011", text: "Many patients leave the hospital with test results still pending, and physicians are often unaware of actionable results that return after discharge." },
+    { cite: "Dalal et al., 2012 · JAMIA", doi: "10.1136/amiajnl-2011-000615", text: "Designed an automated email that notifies the discharging attending when a pending result finalizes, copies the PCP, and suppresses selected tests to limit volume. Most surveyed attendings were satisfied." },
+    { cite: "Dalal et al., 2014 · JAMIA", doi: "10.1136/amiajnl-2013-002030", text: "In a cluster-randomized trial, self-reported awareness of pending results rose from 38% to 76% for attendings and from 33% to 57% for PCPs." },
+    { cite: "Dalal et al., 2018 · Journal of General Internal Medicine", doi: "10.1007/s11606-018-4393-y", text: "The system assigned responsibility to the discharging attending and copied network PCPs. Documented action: 60.7% vs 56.3% (not significant). Median days to documented action: 9 vs 14 (significant). For patients with network PCPs: 70% vs 50%. About 40% of actionable results had no documented follow-up, and only about half were listed in discharge summaries. The authors call for tools that transfer responsibility and find results where no action was taken." },
+    { cite: "Liao et al., 2014 · Journal of Hospital Medicine", doi: "10.1002/jhm.2177", text: "Attendings and PCPs agreed on whether a patient's pending results needed action for 72.5% of patients (kappa 0.29). The authors argue that passive delivery to an inbox, without the reason for the test, a suggested action, or a clear transfer of responsibility, is unlikely to work." },
+    { cite: "Darragh et al., 2018 · Journal of General Internal Medicine", doi: "10.1007/s11606-017-4290-9", text: "Systematic review: discharge summary templates, education, and email alerts show promise; multifaceted interventions need rigorous evaluation." }
+  ]
+};
+
+
+/* ============ VALIDATION ============ */
+const DEFAULT_OPTIONS = [
+  { key: "keep", label: "Keep as written" },
+  { key: "verify", label: "Keep after I verify it myself" },
+  { key: "correct", label: "Correct it to match the source" },
+  { key: "remove", label: "Remove it" }
+];
+function validateCase(c) {
+  const errs = [];
+  const tIds = new Set(c.transcript.map(t => t.id));
+  const chartIds = new Set([...(c.chart.meds || []), ...(c.chart.vitals || [])].map(r => r.id));
+  const known = id => tIds.has(id) || chartIds.has(id);
+  const optKeys = (c.options || DEFAULT_OPTIONS).map(o => o.key);
+  const verdicts = new Set(["accepted", "defensible", "partial", "not"]);
+  const inSections = new Set(c.sections.flatMap(s => s.stmts));
+  Object.entries(c.statements).forEach(([sid, s]) => {
+    if (!inSections.has(sid)) errs.push(sid + " is not placed in any note section");
+    s.links.forEach(l => l.ids.forEach(id => { if (!known(id)) errs.push(sid + " links to missing " + id); }));
+    (s.alsoOk || []).forEach(id => { if (!known(id)) errs.push(sid + " alsoOk lists missing " + id); });
+    if (!s.links.length && !s.noLinkNote) errs.push(sid + " has no source and no explanation");
+    optKeys.forEach(k => { const f = s.fb[k]; if (!f) errs.push(sid + " has no feedback for " + k); else if (!verdicts.has(f[0])) errs.push(sid + " has an invalid verdict for " + k); });
+    if (!optKeys.includes(s.reference)) errs.push(sid + " reference option is invalid");
+    if (s.fb[s.reference] && s.fb[s.reference][0] !== "accepted") errs.push(sid + " reference option is not marked accepted");
+    if (s.error && s.reference === "keep") errs.push(sid + " is marked as an error but its reference is keep");
+  });
+  inSections.forEach(sid => { if (!c.statements[sid]) errs.push("Section lists missing " + sid); });
+  if (!c.task) errs.push("No task prompt");
+  if (!c.role) errs.push("No role framing");
+  if (!c.reflect || !c.reflect.length) errs.push("No reflection prompts");
+  if (c.consequence && !c.statements[c.consequence.when.stmt]) errs.push("Consequence refers to a missing statement");
+  return errs;
+}
+
+/* ============ ENGINE ============ */
+const $ = sel => document.querySelector(sel);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const VERDICT_LABEL = { accepted: "Accepted", defensible: "Defensible", partial: "Partial", not: "Not accepted" };
+const SOURCE_LABEL = { accepted: "Found it", defensible: "Found it, with extras", partial: "Partly found", not: "Not found" };
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  del(k) { try { localStorage.removeItem(k); } catch (e) { /* storage unavailable */ } }
+};
+const VALIDATION = Object.fromEntries(CASES.map(c => [c.id, validateCase(c)]));
+Object.entries(VALIDATION).forEach(([id, e]) => { if (e.length) console.warn("Case validation " + id + ":", e); });
+const keyFor = c => "provlab:" + c.id + ":" + c.version;
+const fresh = () => ({ screen: "intro", selected: null, tab: "transcript", flags: [], inspected: [], cites: {}, nosrc: [], decisions: {}, drafts: {}, log: [], start: null, confirming: false, reflection: "", checks: [], copied: false, search: "" });
+const load = c => Object.assign(fresh(), store.get(keyFor(c)) || {});
+
+let C = CASES.find(c => c.id === store.get("provlab:last")) || CASES[0];
+let S = load(C);
+if (S.screen !== "intro" && !S.start) S.screen = "intro";
+
+const opts = () => C.options || DEFAULT_OPTIONS;
+const optLabel = k => (opts().find(o => o.key === k) || {}).label || k;
+const isFind = () => C.citations === "find";
+const refIds = sid => C.statements[sid].links.flatMap(l => l.ids);
+const chartRow = id => [...(C.chart.meds || []).map(r => ({ ...r, tab: "Medication list" })), ...(C.chart.vitals || []).map(r => ({ ...r, tab: "Vitals" }))].find(r => r.id === id);
+const lineName = id => { const r = chartRow(id); return r ? r.tab.toLowerCase() + " (" + r.name + ")" : id; };
+const listNames = ids => ids.map(lineName).join(", ");
+const checked = sid => isFind() ? ((S.cites[sid] || []).length > 0 || S.nosrc.includes(sid)) : S.inspected.includes(sid);
+
+function save() { const { copied, ...rest } = S; store.set(keyFor(C), rest); store.set("provlab:last", C.id); if (typeof ACTIVE !== "undefined") store.set("provlab:active", ACTIVE); }
+function stamp() { if (!S.start) return "00:00"; const s = Math.floor((Date.now() - S.start) / 1000); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }
+function log(action, sid, detail) { S.log.push({ t: stamp(), action, sid: sid || "", detail: detail || "" }); }
+function setState(patch) { Object.assign(S, patch); save(); render(); }
+
+function sourceCheck(sid) {
+  const s = C.statements[sid], ref = refIds(sid), ok = new Set(s.alsoOk || []);
+  const cited = S.cites[sid] || [], none = S.nosrc.includes(sid);
+  if (!ref.length) {
+    if (none) return ["accepted", "Right. No line in the record supports this statement."];
+    if (cited.length && cited.every(id => ok.has(id))) return ["defensible", "Those lines are related, but none of them actually says this."];
+    return ["not", "No line supports this statement, and the lines you picked do not say it."];
+  }
+  if (none || !cited.length) return ["not", "Missed. The evidence is at " + listNames(ref) + "."];
+  const hits = cited.filter(id => ref.includes(id));
+  const extra = cited.filter(id => !ref.includes(id) && !ok.has(id));
+  if (!hits.length) return ["not", "Not the deciding lines. The evidence is at " + listNames(ref) + "."];
+  const missing = ref.filter(id => !hits.includes(id));
+  if (missing.length) return ["partial", "Found " + listNames(hits) + ", but the full picture also needs " + listNames(missing) + "."];
+  if (extra.length) return ["defensible", "Found " + listNames(hits) + ". " + listNames(extra) + " do not bear on this statement."];
+  return ["accepted", "Found it: " + listNames(hits) + "."];
+}
+
+try { document.documentElement.lang = "en"; } catch (e) { /* ignore */ }
+const FOCUS_ATTRS = ["data-ev", "data-stmt", "data-lab", "data-act", "data-open-lever", "data-tab", "data-case", "data-module", "data-cite"];
+function focusKey(el) {
+  if (!el || el === document.body) return null;
+  if (el.id) return { sel: "#" + CSS.escape(el.id), start: el.selectionStart, end: el.selectionEnd };
+  for (const a of FOCUS_ATTRS) if (el.hasAttribute && el.hasAttribute(a)) return { sel: "[" + a + '="' + CSS.escape(el.getAttribute(a)) + '"]' };
+  return null;
+}
+function restoreFocus(k) {
+  if (!k) return;
+  const el = document.querySelector(k.sel);
+  if (!el) return;
+  try { el.focus({ preventScroll: true }); if (k.start != null && el.setSelectionRange) el.setSelectionRange(k.start, k.end); } catch (e) { /* ignore */ }
+}
+
+function render() {
+  const fk = focusKey(document.activeElement);
+  renderInner();
+  restoreFocus(fk);
+}
+
+function renderInner() {
+  if (ACTIVE === "lab" && L.screen !== "home") { const y = window.scrollY; $("#app").innerHTML = labView(); window.scrollTo(0, y); bindLab(); return; }
+  const srcTop = $("#source") ? $("#source").scrollTop : null;
+  const scrollY = window.scrollY;
+  const home = ACTIVE === "lab" || S.screen === "intro";
+  $("#app").innerHTML = topBar(home) + (home ? intro() : S.screen === "work" ? work() : debrief());
+  if (!home) window.scrollTo(0, scrollY);
+  if (srcTop !== null && $("#source")) $("#source").scrollTop = srcTop;
+  bind();
+  applySearch();
+}
+
+function topBar(home) {
+  if (home) return `<header class="bar"><div class="brand"><h1>Provenance Lab</h1><span class="mono">clinical informatics modules</span></div><div class="bar-meta"><span class="pill warn">Prototype, not yet clinically reviewed</span><span class="pill">Synthetic patient data</span></div></header>`;
+  return `<header class="bar">
+    <div class="brand"><h1>Provenance Lab</h1><span class="mono">${esc(C.id)} v${esc(C.version)}</span></div>
+    <div class="bar-meta">
+      ${C.reviewStatus !== "approved" ? `<span class="pill warn">Draft case, not yet clinically reviewed</span>` : ""}
+      <span class="pill">Synthetic patient data</span>
+      <button class="btn ghost" data-act="home">All modules</button><button class="btn ghost" data-act="reset">Reset case</button>
+    </div>
+  </header>`;
+}
+
+function intro() {
+  const labSel = ACTIVE === "lab";
+  const bad = labSel ? LAB_ERRORS : VALIDATION[C.id];
+  const started = labSel ? !!L.start : !!S.start;
+  return `<section class="intro">
+    <div class="intro-lead">
+      <p class="label">Clinical informatics · EHR workflow</p>
+      <h2 style="margin-top:8px">Every line in a chart came from somewhere.</h2>
+      <p>Trace where clinical information came from, find where a workflow let it fall through, and change the system to see what your change does. For anyone new to clinical informatics, student to attending.</p>
+      <ol class="steps">
+        <li><span><strong>Investigate</strong> the record</span></li>
+        <li><span><strong>Fix</strong> the note or the workflow</span></li>
+        <li><span><strong>Compare</strong> your result with a reference and the research</span></li>
+      </ol>
+    </div>
+    <div class="panel setup">
+      <div>
+        <p class="label" style="margin-bottom:8px">Choose a module</p>
+        <div class="case-list">
+          <button class="case-opt featured" data-module="lab" aria-pressed="${labSel}"><strong>${esc(LAB.title)}</strong><span class="mode lab">Lab</span><span class="sub">${esc(LAB.modeLabel)} · results pending at discharge</span></button>
+          ${CASES.filter(c => c.mode !== "hard").map(c => { const n = Object.keys(c.statements).length; return `<button class="case-opt" data-case="${c.id}" aria-pressed="${!labSel && c.id === C.id}"><strong>${esc(c.shortTitle)}</strong><span class="mode ${c.mode}">${esc(c.mode === "hard" ? "Hard" : "Warm-up")}</span><span class="sub">${esc(c.modeLabel)} · ${n} statements, ${c.transcript.length}-line visit</span></button>`; }).join("")}
+          ${COMING.map(c => `<button class="case-opt" disabled aria-disabled="true"><strong>${esc(c.title)}</strong><span class="mono">soon</span><span class="sub">${esc(c.sub)}</span></button>`).join("")}
+        </div>
+      </div>
+      <p class="objective"><strong style="color:var(--ink)">The situation.</strong> ${esc(labSel ? LAB.role : (C.role || ""))}</p>
+      <p class="objective"><strong style="color:var(--ink)">What you will do.</strong> ${esc(labSel ? LAB.objective : C.objective)}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+        <span class="check-line"><span class="dot ${bad.length ? "bad" : ""}"></span>${bad.length ? bad.length + " content problems, see console" : "Content checked: all links, answers, and paths present"}</span>
+        <button class="btn primary" ${labSel ? 'data-lab="begin"' : 'data-act="start"'} ${bad.length ? "disabled" : ""}>${started ? "Resume" : "Start"}</button>
+      </div>
+    </div>
+  </section>`;
+}
+
+function work() {
+  const P = C.patient;
+  const ids = Object.keys(C.statements);
+  const decided = ids.filter(i => S.decisions[i]).length, total = ids.length;
+  return `
+  <div class="task"><div class="task-text"><p><span class="label">The situation</span>${esc(C.role)}</p><p><span class="label">Your task</span>${esc(C.task)}</p></div><span class="pill">${decided} of ${total} statements decided</span></div>
+  <div class="patient"><strong>${esc(P.name)}</strong><span>${P.age} ${esc(P.sex)}</span><span class="mono">MRN ${esc(P.mrn)}</span><span>${esc(P.context)}</span><span class="mode ${C.mode}">${C.mode === "hard" ? "Hard mode" : "Easy mode"}</span></div>
+  <div class="grid">
+    <section class="col col-src panel" aria-label="Source evidence">
+      <div class="pane-head"><span class="label">Source evidence</span>${isFind() ? `<span class="cite-hint">${S.selected ? `Click lines to cite them for <span class="mono">${S.selected}</span>` : "Select a statement first"}</span>` : ""}</div>
+      <div class="tabs" role="tablist">
+        ${[["transcript", "Encounter transcript"], ["meds", "Medication list"], ["vitals", "Vitals"]].map(([k, n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab === k}">${n}</button>`).join("")}
+      </div>
+      ${S.tab === "transcript" ? `<div class="search"><label for="search" class="sr">Search the transcript</label><input id="search" type="search" placeholder="Search the transcript" value="${esc(S.search)}" autocomplete="off"><span id="search-count" class="mono"></span></div>` : ""}
+      <div class="pane-body source-scroll" id="source">${sourceBody()}</div>
+    </section>
+    <section class="col col-note panel" aria-label="AI-drafted note">
+      <div class="pane-head"><div class="note-head"><h3>Clinic visit note</h3><span>Drafted by ambient scribe · unsigned</span></div><span class="pill">${S.flags.length} flagged</span></div>
+      <div class="pane-body">
+        ${C.sections.map(sec => `<div class="note-sec"><p class="label">${esc(sec.name)}</p>${sec.stmts.map(stmtRow).join("")}</div>`).join("")}
+      </div>
+    </section>
+    <aside class="col col-insp" aria-label="Inspector"><div class="panel inspector">${inspector()}</div></aside>
+  </div>
+  <div class="sign-bar">
+    <p>${total - decided ? `${total - decided} statement${total - decided === 1 ? "" : "s"} still undecided. Undecided statements are signed as written.` : "Every statement has a decision."}</p>
+    <button class="btn primary" data-act="presign">Review and sign</button>
+  </div>
+  ${S.confirming ? `<div class="confirm" role="alertdialog" aria-label="Confirm signing">
+    <p><strong>Sign this note?</strong> ${total - decided ? `${total - decided} undecided statement${total - decided === 1 ? " will" : "s will"} be signed exactly as the draft wrote ${total - decided === 1 ? "it" : "them"}.` : "Your decisions will be applied to the signed note."}</p>
+    <div class="row"><button class="btn primary" data-act="sign">Sign note</button><button class="btn" data-act="cancelsign">Keep reviewing</button></div>
+  </div>` : ""}`;
+}
+
+function lineState(id) {
+  const sid = S.selected, cls = [];
+  if (!sid) return { cls: "", attrs: "" };
+  if (!isFind()) {
+    if (S.inspected.includes(sid) && refIds(sid).includes(id)) cls.push("hl");
+    return { cls: cls.join(" "), attrs: "" };
+  }
+  const cited = (S.cites[sid] || []).includes(id);
+  if (cited) cls.push("cited");
+  if (S.decisions[sid] && refIds(sid).includes(id)) cls.push("ref");
+  cls.push("citable");
+  return { cls: cls.join(" "), attrs: `role="button" tabindex="0" data-cite="${id}" aria-pressed="${cited}"` };
+}
+
+function sourceBody() {
+  if (S.tab === "transcript") return C.transcript.map(t => { const st = lineState(t.id); return `<div class="tline ${st.cls}" id="line-${t.id}" data-line="${t.id}" ${st.attrs}><span class="mono">${t.id}</span><span class="who">${esc(t.who)}</span><span class="ttext">${esc(t.text)}</span></div>`; }).join("");
+  return (C.chart[S.tab] || []).map(r => { const st = lineState(r.id); return `<div class="rec ${st.cls}" id="line-${r.id}" ${st.attrs}><span>${esc(r.name)}</span><span class="meta"><span class="mono">${r.id}</span> · ${esc(r.meta)}</span></div>`; }).join("");
+}
+
+function applySearch() {
+  const q = (S.search || "").trim().toLowerCase();
+  let n = 0;
+  document.querySelectorAll(".tline").forEach(el => {
+    const t = C.transcript.find(x => x.id === el.dataset.line); if (!t) return;
+    const span = el.querySelector(".ttext"), i = q ? t.text.toLowerCase().indexOf(q) : -1;
+    if (!q) { span.textContent = t.text; el.classList.remove("dim"); return; }
+    if (i < 0) { span.textContent = t.text; el.classList.add("dim"); }
+    else { n++; span.innerHTML = esc(t.text.slice(0, i)) + "<mark>" + esc(t.text.slice(i, i + q.length)) + "</mark>" + esc(t.text.slice(i + q.length)); el.classList.remove("dim"); }
+  });
+  const c = $("#search-count"); if (c) c.textContent = q ? n + (n === 1 ? " line" : " lines") : "";
+}
+
+function finalText(sid) {
+  const d = S.decisions[sid];
+  if (d && d.option === "correct" && d.text) return d.text;
+  return C.statements[sid].text;
+}
+
+function stmtRow(sid) {
+  const s = C.statements[sid], d = S.decisions[sid], flagged = S.flags.includes(sid);
+  const nCited = (S.cites[sid] || []).length;
+  return `<button class="stmt ${flagged ? "flagged" : ""}" data-stmt="${sid}" aria-current="${S.selected === sid}">
+    <span class="mono">${sid}</span>
+    <span class="txt">${d && (d.option === "remove" || (d.option === "correct" && d.text)) ? `<span class="deleted">${esc(s.text)}</span>` : esc(s.text)}${d && d.option === "correct" && d.text ? `<span class="edited">Edited: ${esc(d.text)}</span>` : ""}</span>
+    <span class="marks">${flagged ? `<span class="mk flag">flag</span>` : ""}${isFind() && (nCited || S.nosrc.includes(sid)) ? `<span class="mk">${nCited ? nCited + " cited" : "no src"}</span>` : ""}${d ? `<span class="mk dec">${esc(d.option)}</span>` : ""}</span>
+  </button>`;
+}
+
+function evidencePanel(sid) {
+  const s = C.statements[sid];
+  if (isFind()) {
+    const cited = S.cites[sid] || [], none = S.nosrc.includes(sid);
+    return `<div class="prov">
+      <p class="label">Your evidence</p>
+      ${cited.length ? `<div class="chips">${cited.map(id => `<button class="chip" data-uncite="${id}" aria-label="Remove ${id}">${esc(chartRow(id) ? chartRow(id).tab + " · " + id : id)} <span aria-hidden="true">×</span></button>`).join("")}</div>` : none ? `<p class="prov-item prov-none">You marked that no line supports this statement.</p>` : `<p class="example-note">Click lines in the transcript, medication list, or vitals to cite them. No citations are given in hard mode.</p>`}
+      <button class="btn" style="justify-self:start" data-act="nosrc" aria-pressed="${none}">${none ? "Undo: no line supports this" : "No line supports this"}</button>
+    </div>`;
+  }
+  if (!S.inspected.includes(sid)) return "";
+  return `<div class="prov">
+    <p class="label">What the draft cited</p>
+    ${s.links.length ? s.links.map(l => l.kind === "transcript"
+      ? `<div class="prov-item"><span class="k">Encounter transcript</span><span>Lines <span class="mono">${l.ids.join(", ")}</span>, highlighted in the source pane</span></div>`
+      : `<div class="prov-item"><span class="k">${esc(l.label)} · chart</span><span>${esc(l.detail)}</span><button class="btn ghost" style="justify-self:start;padding:2px 0" data-goto="${l.tab}">Show in ${esc(l.label.toLowerCase())}</button></div>`).join("")
+      : `<div class="prov-item prov-none"><span class="k">No linked source</span><span>${esc(s.noLinkNote)}</span></div>`}
+    <p class="example-note">A citation shows where the draft looked, not whether it read the source correctly. Compare the words yourself.</p>
+  </div>`;
+}
+
+function inspector() {
+  const sid = S.selected;
+  if (!sid) return `<div class="pane-head"><span class="label">Inspector</span></div><div class="pane-body empty"><p>Select a statement in the draft to start.</p><p>${isFind() ? "Most statements in this note are accurate. The errors hide among them." : "Start with whatever looks routine. Routine-looking lines are where drafts tend to fill in defaults."}</p></div>`;
+  const s = C.statements[sid], flagged = S.flags.includes(sid), ready = checked(sid);
+  const d = S.decisions[sid], draft = S.drafts[sid] || {};
+  const chosen = draft.option ?? d?.option ?? "";
+  const editText = draft.text ?? d?.text ?? s.text;
+  const just = draft.why ?? d?.why ?? "";
+  const fb = d ? s.fb[d.option] : null;
+  const sc = d && isFind() ? sourceCheck(sid) : null;
+  return `<div class="pane-head"><span class="label">Inspector · <span class="mono">${sid}</span></span></div>
+  <div class="pane-body">
+    <div class="insp-stmt">${esc(s.text)}</div>
+    <div class="insp-actions">
+      ${isFind() ? "" : `<button class="btn" data-act="inspect" ${S.inspected.includes(sid) ? "disabled" : ""}>${S.inspected.includes(sid) ? "Source shown" : "Inspect source"}</button>`}
+      <button class="btn" data-act="flag" aria-pressed="${flagged}">${flagged ? "Remove flag" : "Flag as suspect"}</button>
+    </div>
+    ${evidencePanel(sid)}
+    ${ready ? `<form class="decide" data-form="${sid}">
+      <p class="label">Your decision</p>
+      <div class="opts" role="radiogroup">
+        ${opts().map(o => `<label class="opt"><input type="radio" name="opt-${sid}" id="opt-${sid}-${o.key}" value="${o.key}" ${chosen === o.key ? "checked" : ""}><span>${esc(o.label)}</span></label>`).join("")}
+      </div>
+      ${chosen === "correct" ? `<label for="edit-${sid}" class="label">Corrected wording</label><textarea id="edit-${sid}" data-edit="${sid}" aria-describedby="edit-help-${sid}">${esc(editText)}</textarea><p class="example-note" id="edit-help-${sid}">Your wording is not checked automatically. Compare it with the reference after you record it.</p>` : ""}
+      ${S.formError && S.formError.sid === sid ? `<p class="fb not" role="alert"><strong>Not recorded</strong><span>${esc(S.formError.msg)}</span></p>` : ""}
+      <label for="why-${sid}" class="label">Why, in a sentence or two <span class="opt-tag">Optional</span></label>
+      <textarea id="why-${sid}" data-why="${sid}" placeholder="Name the source that decided it.">${esc(just)}</textarea>
+      ${chosen ? "" : `<p class="example-note">Choose one of the options above to record your decision.</p>`}
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="submit" ${chosen ? "" : "disabled"}>${d ? "Update decision" : "Record decision"}</button><button class="btn ghost" type="button" data-act="next">Next statement</button></div>
+    </form>` : `<p class="locked">${isFind() ? "Cite at least one line, or mark that no line supports it, before deciding." : "Inspect the source before deciding. The decision unlocks once you have seen what the draft cited."}</p>`}
+    ${fb ? `<div class="fb ${fb[0]}" style="margin-top:14px" aria-live="polite"><strong>Your choice: ${VERDICT_LABEL[fb[0]].toLowerCase()}</strong><span>${esc(fb[1])}</span>${s.refText && d.option !== s.reference ? `<span class="ref">Reference: ${esc(optLabel(s.reference).toLowerCase())}. ${esc(s.refText)}</span>` : s.refText && d.option === "correct" ? `<span class="ref">This rates the action you chose, not your wording. Reference wording: ${esc(s.refText)}</span>` : ""}</div>` : ""}
+    ${sc ? `<div class="fb ${sc[0]}" style="margin-top:8px"><strong>Source check · ${SOURCE_LABEL[sc[0]]}</strong><span>${esc(sc[1])}</span>${refIds(sid).length ? `<span class="ref">Reference lines are now outlined in green in the source pane.</span>` : ""}</div>` : ""}
+  </div>`;
+}
+
+function todoList(items) {
+  if (items.every(i => i.done)) return "";
+  return `<div class="todo" role="status" aria-live="polite"><span class="label">To continue</span><ul>${items.map(i => `<li class="${i.done ? "done" : ""}"><span class="tick" aria-hidden="true">${i.done ? "✓" : "○"}</span>${esc(i.text)}${i.done ? '<span class="sr"> (done)</span>' : ""}</li>`).join("")}</ul></div>`;
+}
+const norm = t => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function correctionProblem(original, text) {
+  if (!norm(text)) return "Write the corrected wording before recording this decision.";
+  if (norm(text) === norm(original)) return "Your wording is the same as the draft. Change it to match the source, or choose another option.";
+  return "";
+}
+
+function consequenceFires() {
+  const w = C.consequence?.when; if (!w) return false;
+  const d = S.decisions[w.stmt];
+  if (d && d.option === "correct" && norm(d.text) === norm(C.statements[w.stmt].text)) return true;
+  return w.decisions.includes(d ? d.option : null);
+}
+
+function debrief() {
+  const ids = Object.keys(C.statements);
+  const signEntry = [...S.log].reverse().find(e => e.action === "sign");
+  const errors = ids.filter(i => C.statements[i].error), accurate = ids.filter(i => !C.statements[i].error);
+  const caught = errors.filter(i => S.decisions[i] && C.statements[i].fb[S.decisions[i].option][0] !== "not" && !(S.decisions[i].option === "correct" && correctionProblem(C.statements[i].text, S.decisions[i].text))).length;
+  const checkedAcc = accurate.filter(checked).length;
+  const found = isFind() ? ids.filter(i => S.decisions[i] && ["accepted", "defensible"].includes(sourceCheck(i)[0])).length : 0;
+  const rows = ids.map(i => {
+    const s = C.statements[i], d = S.decisions[i];
+    const opt = d ? d.option : "keep";
+    const fb = s.fb[opt], sc = isFind() && d ? sourceCheck(i) : null;
+    return `<tr><td class="mono">${i}${s.error ? `<br><span class="err-tag">error</span>` : ""}</td><td>${esc(s.text)}</td><td>${d ? esc(optLabel(opt)) : `<span style="color:var(--muted)">Signed as written (no decision)</span>`}${isFind() ? "" : `<br><span style="font-size:12.5px;color:var(--muted)">${S.inspected.includes(i) ? "Source inspected" : "Source not inspected"}</span>`}</td><td>${esc(optLabel(s.reference))}</td><td><span class="v ${fb[0]}">${VERDICT_LABEL[fb[0]]}</span></td>${isFind() ? `<td>${sc ? `<span class="v ${sc[0]}">${SOURCE_LABEL[sc[0]]}</span>` : `<span style="color:var(--muted);font-size:13px">Not checked</span>`}<br><span style="font-size:12.5px;color:var(--muted)">Evidence: ${refIds(i).length ? esc(refIds(i).join(", ")) : "none"}</span></td>` : ""}</tr>`;
+  }).join("");
+  const signed = C.sections.map(sec => `<p class="label sec-name">${esc(sec.name)}</p>` + sec.stmts.map(i => {
+    const d = S.decisions[i];
+    if (d && d.option === "remove") return "";
+    return `<p>${esc(finalText(i))}${d && d.option === "verify" ? ` <span class="ver">(verified by signer)</span>` : ""}</p>`;
+  }).join("")).join("");
+  return `<section class="debrief">
+    <div><p class="label">Debrief · ${C.mode === "hard" ? "Hard mode" : "Easy mode"}</p><h2 style="margin-top:6px">Your path compared with the reference path</h2></div>
+    ${consequenceFires() ? `<div class="event" role="note"><p class="label">${esc(C.consequence.title)}</p><p>${esc(C.consequence.text)}</p><p class="note">${esc(C.consequence.caveat)}</p></div>` : ""}
+    <div class="panel sec">
+      <h3>What you did</h3>
+      <p class="example-note">This shows completion, not a judgment of your reasoning. The comparison below and your own review do that.</p>
+      <div class="stats">
+        <div class="stat"><b>${caught}/${errors.length}</b><span>appropriate action choices on errors</span></div>
+        <div class="stat"><b>${checkedAcc}/${accurate.length}</b><span>accurate statements you checked</span></div>
+        ${isFind() ? `<div class="stat"><b>${found}/${ids.length}</b><span>sources found</span></div>` : ""}
+        <div class="stat"><b>${signEntry ? signEntry.t : "00:00"}</b><span>time spent verifying ${ids.length} statements</span></div>
+      </div>
+      <p class="example-note">${errors.length} of ${ids.length} statements contained an error. Checking the accurate ones is the cost of finding the rest. Action choices count what you decided to do with each error; your corrected wording is not checked automatically, so compare it with the expert revision below.</p>
+    </div>
+    <div class="panel sec">
+      <h3>Statement by statement</h3>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Draft statement</th><th>Your decision</th><th>Reference</th><th>Your action</th>${isFind() ? "<th>Source check</th>" : ""}</tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="example-note">Defensible means a reasonable clinician could choose it. More than one answer can be acceptable.</p>
+    </div>
+    <div class="panel sec signed">
+      <h3>The note you signed</h3>
+      <div>${signed}</div>
+    </div>
+    <div class="panel sec">
+      <h3>Expert revision</h3>
+      <blockquote>${esc(C.expertNote)}</blockquote>
+      <p class="example-note">${esc(C.expertNoteAfter)}</p>
+      <p class="label" style="margin-top:6px">Self-review checklist</p>
+      <div class="checklist">${C.checklist.map((c, n) => `<label><input type="checkbox" id="chk-${n}" data-chk="${n}" ${S.checks.includes(n) ? "checked" : ""}><span>${esc(c)}</span></label>`).join("")}</div>
+    </div>
+    <div class="panel sec">
+      <h3>Check your understanding</h3>
+      ${C.reflectMC ? C.reflectMC.map(q => mcBlock(q, S.refl || (S.refl = {}), "case")).join("") : ""}
+      <details class="optional-q"${C.reflectMC ? "" : " open"}><summary>${C.reflectMC ? "Optional: write your own reflection" : "Reflect"}</summary><ol style="margin:0 0 8px;padding-left:20px;display:grid;gap:4px">${C.reflect.map(q => `<li>${esc(q)}</li>`).join("")}</ol><textarea id="reflect" data-reflect placeholder="A few sentences.">${esc(S.reflection)}</textarea></details>
+      <details><summary>Going further: ${esc(C.goingFurther.q)}</summary><p class="example-note" style="margin-top:6px">${esc(C.goingFurther.example)}</p></details>
+    </div>
+    <div class="panel sec">
+      <h3>Teaching points</h3>
+      <ul class="points">${C.debrief.map(p => `<li>${esc(p)}</li>`).join("")}</ul>
+    </div>
+    <div class="panel sec">
+      <h3>Session record</h3>
+      <div class="log">${S.log.map(e => `<span>${esc(e.t)}  ${esc(e.action.padEnd(8))} ${esc(e.sid)} ${esc(e.detail)}</span>`).join("") || "<span>No actions logged.</span>"}</div>
+      <div class="actions-row"><button class="btn" data-act="copy">Copy session summary</button><button class="btn primary" data-act="retry">Retry the case</button><button class="btn ghost" data-act="home">All cases</button>${S.copied ? `<span class="toast" aria-live="polite">Copied</span>` : ""}</div>
+      <textarea id="copy-fallback" readonly hidden></textarea>
+    </div>
+  </section>`;
+}
+
+function summaryText() {
+  const lines = [`Provenance Lab · ${C.id} v${C.version}`, ""];
+  Object.keys(C.statements).forEach(i => {
+    const d = S.decisions[i], opt = d ? d.option : "keep", v = C.statements[i].fb[opt][0];
+    const sc = isFind() && d ? " | Source: " + SOURCE_LABEL[sourceCheck(i)[0]] : "";
+    lines.push(`${i}: ${d ? optLabel(opt) : "Signed as written"} (${VERDICT_LABEL[v]})${sc}${d?.why ? " | Why: " + d.why : ""}`);
+  });
+  lines.push("", "Reflection: " + (S.reflection || "(none)"), "", "Log:");
+  S.log.forEach(e => lines.push(`${e.t} ${e.action} ${e.sid} ${e.detail}`.trim()));
+  return lines.join("\n");
+}
+
+function scrollToLinked() {
+  if (isFind()) return;
+  const ids = S.selected && S.inspected.includes(S.selected) ? refIds(S.selected) : [];
+  if (!ids.length) return;
+  const el = document.getElementById("line-" + ids[0]), box = $("#source");
+  if (el && box && box.scrollHeight > box.clientHeight) box.scrollTo({ top: el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8, behavior: "smooth" });
+}
+
+function toggleCite(id) {
+  const sid = S.selected; if (!sid) return;
+  const cur = S.cites[sid] || [];
+  const on = !cur.includes(id);
+  S.cites[sid] = on ? [...cur, id] : cur.filter(x => x !== id);
+  S.nosrc = S.nosrc.filter(x => x !== sid);
+  if (!S.inspected.includes(sid)) S.inspected.push(sid);
+  log(on ? "cite" : "uncite", sid, id);
+  save(); render();
+}
+
+function bind() {
+  document.querySelectorAll("[data-case]").forEach(b => b.onclick = () => { save(); ACTIVE = "case"; C = CASES.find(c => c.id === b.dataset.case); S = load(C); S.screen = "intro"; save(); render(); });
+  document.querySelectorAll("[data-module]").forEach(b => b.onclick = () => { ACTIVE = "lab"; L.screen = "home"; labSave(); render(); });
+  bindLab();
+  document.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; save(); render(); if ($("#source")) $("#source").scrollTop = 0; });
+  document.querySelectorAll("[data-goto]").forEach(b => b.onclick = () => { setState({ tab: b.dataset.goto }); scrollToLinked(); });
+  document.querySelectorAll("[data-cite]").forEach(el => {
+    el.onclick = () => toggleCite(el.dataset.cite);
+    el.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCite(el.dataset.cite); } };
+  });
+  document.querySelectorAll("[data-uncite]").forEach(b => b.onclick = () => toggleCite(b.dataset.uncite));
+  document.querySelectorAll("[data-stmt]").forEach(b => b.onclick = () => {
+    const sid = b.dataset.stmt, s = C.statements[sid];
+    if (isFind()) setState({ selected: sid });
+    else { const tlink = s.links.find(l => l.kind === "transcript"); setState({ selected: sid, tab: tlink || !s.links.length ? "transcript" : s.links[0].tab }); scrollToLinked(); }
+    if (window.innerWidth <= 1100) document.querySelector(".col-insp")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  document.querySelectorAll("[data-act]").forEach(b => b.onclick = () => act(b.dataset.act));
+  const search = $("#search");
+  if (search) search.oninput = () => {
+    S.search = search.value; save(); applySearch();
+    const first = document.querySelector(".tline:not(.dim) mark"), box = $("#source");
+    if (first && box) box.scrollTo({ top: first.closest(".tline").getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8, behavior: "smooth" });
+  };
+  const form = document.querySelector("[data-form]");
+  if (form) {
+    const sid = form.dataset.form;
+    form.querySelectorAll("input[type=radio]").forEach(r => r.onchange = () => { S.drafts[sid] = Object.assign({}, S.drafts[sid], { option: r.value }); S.formError = null; save(); render(); });
+    const ed = form.querySelector("[data-edit]"); if (ed) ed.oninput = () => { S.drafts[sid] = Object.assign({}, S.drafts[sid], { text: ed.value }); save(); };
+    const why = form.querySelector("[data-why]"); if (why) why.oninput = () => { S.drafts[sid] = Object.assign({}, S.drafts[sid], { why: why.value }); save(); };
+    form.onsubmit = e => {
+      e.preventDefault();
+      const dr = S.drafts[sid] || {}, prev = S.decisions[sid] || {};
+      const option = dr.option ?? prev.option; if (!option) return;
+      const dec = { option, why: (dr.why ?? prev.why ?? "").trim(), text: option === "correct" ? (dr.text ?? prev.text ?? C.statements[sid].text).trim() : "" };
+      if (option === "correct") { const pb = correctionProblem(C.statements[sid].text, dec.text); if (pb) { S.formError = { sid, msg: pb }; save(); render(); return; } }
+      S.formError = null;
+      S.decisions[sid] = dec; delete S.drafts[sid];
+      log("decide", sid, option + (dec.why ? " +reason" : ""));
+      save(); render();
+    };
+  }
+  const rf = document.querySelector("[data-reflect]"); if (rf) rf.oninput = () => { S.reflection = rf.value; save(); };
+  if (S.screen === "debrief" && ACTIVE === "case") bindMC(S.refl || (S.refl = {}), save, "case");
+  document.querySelectorAll("[data-chk]").forEach(c => c.onchange = () => {
+    const n = Number(c.dataset.chk);
+    S.checks = c.checked ? [...new Set([...S.checks, n])] : S.checks.filter(x => x !== n); save();
+  });
+}
+
+function act(a) {
+  const sid = S.selected;
+  if (a === "start") { if (!S.start) { S.start = Date.now(); log("start", "", C.mode); } setState({ screen: "work" }); window.scrollTo(0, 0); }
+  else if (a === "inspect" && sid) { if (!S.inspected.includes(sid)) { S.inspected.push(sid); log("inspect", sid); } save(); render(); scrollToLinked(); }
+  else if (a === "nosrc" && sid) { const on = !S.nosrc.includes(sid); S.nosrc = on ? [...S.nosrc, sid] : S.nosrc.filter(x => x !== sid); if (on) S.cites[sid] = []; if (!S.inspected.includes(sid)) S.inspected.push(sid); log(on ? "nosource" : "undo-nosrc", sid); save(); render(); }
+  else if (a === "flag" && sid) { const on = !S.flags.includes(sid); S.flags = on ? [...S.flags, sid] : S.flags.filter(x => x !== sid); log(on ? "flag" : "unflag", sid); save(); render(); }
+  else if (a === "next") { const order = C.sections.flatMap(s => s.stmts); const i = order.indexOf(sid); setState({ selected: order[(i + 1) % order.length] }); scrollToLinked(); }
+  else if (a === "presign") { setState({ confirming: true }); }
+  else if (a === "cancelsign") { setState({ confirming: false }); }
+  else if (a === "sign") { log("sign", "", Object.keys(S.decisions).length + " decided"); setState({ screen: "debrief", confirming: false }); window.scrollTo(0, 0); }
+  else if (a === "copy") {
+    const txt = summaryText();
+    const done = () => { S.copied = true; render(); setTimeout(() => { S.copied = false; render(); }, 1800); };
+    try { navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt)); } catch (e) { fallbackCopy(txt); }
+  }
+  else if (a === "retry" || a === "reset") { store.del(keyFor(C)); S = Object.assign(fresh(), { screen: "work", start: Date.now() }); log("start", "", C.mode + " retry"); save(); render(); window.scrollTo(0, 0); }
+  else if (a === "home") { setState({ screen: "intro", confirming: false }); window.scrollTo(0, 0); }
+}
+function fallbackCopy(txt) {
+  const ta = $("#copy-fallback"); if (!ta) return;
+  ta.hidden = false; ta.value = txt; ta.style.minHeight = "160px"; ta.focus(); ta.select();
+}
+
+/* ============ WORKFLOW LAB (engine) ============ */
+const LEVERS = LAB.levers;
+const CURRENT_CFG = Object.fromEntries(LEVERS.map(l => [l.key, l.options.find(o => o.current).key]));
+const cfgKey = cfg => LEVERS.map(l => cfg[l.key]).join("|");
+const keyCfg = k => Object.fromEntries(k.split("|").map((v, i) => [LEVERS[i].key, v]));
+const optOf = (lever, key) => LEVERS.find(l => l.key === lever).options.find(o => o.key === key);
+const changedLevers = cfg => LEVERS.filter(l => cfg[l.key] !== CURRENT_CFG[l.key]);
+const BASE_KEY = cfgKey(CURRENT_CFG);
+const PILOT_MAX = 2;
+const TARGET_DAYS = 2; // teaching target for response time, not a clinical standard
+const PREDICT_OPTS = [
+  ["E3", "Discharge: what the summary says is pending"],
+  ["E5", "Routing: who receives the final read"],
+  ["E6", "What the recipient does with it"],
+  ["E7", "What the PCP learns"],
+  ["new", "A step that did not exist before"]
+];
+
+function auditCatches(r) { return r.recommendation && !r.order && !r.noActionDecision; }
+const ALL_CFGS = LEVERS.reduce((acc, lv) => acc.flatMap(c => lv.options.map(o => ({ ...c, [lv.key]: o.key }))), [{}]);
+
+/* The replay model. Every event records which of the learner's rules changed it (cause) and which original event it replaces (ref). */
+function simulate(cfg, stress) {
+  const evs = [];
+  const add = (day, when, title, detail, states, ref, cause) => evs.push({ day, when, title, detail, states: states || [], ref: ref || null, cause: (cause || []).filter(k => cfg[k] !== CURRENT_CFG[k]) });
+  const flagged = cfg.capture === "flagged", ctx = cfg.context === "context" && flagged, disp = cfg.closure === "disposition";
+  add(3, "Day 3 · 14:00", flagged ? "Discharge: CT listed as pending" : "Discharge: nothing listed as pending",
+    (flagged ? "Studies with only a preliminary read now count as pending. Dr. Reyes confirms the list: CT chest, final read pending." : "The pending section reads None, because the preliminary read made the CT look complete.")
+    + (cfg.context === "context" ? (flagged ? " The team adds a note: ordered to rule out empyema; if the final read shows anything beyond pneumonia, arrange outpatient follow-up." : " Your handoff rule asks the team to annotate each pending test, but the CT is not on the list, so nothing is annotated.") : ""),
+    flagged ? ["ordered", "pending"] : ["ordered"], "E3", ["capture", "context"]);
+  add(4, "Day 4 · 09:40", "Final read issued", "Incidental 8 mm nodule; follow-up chest CT in 6 to 12 months recommended on the last line of the impression.", ["final"], "E4");
+  const recip = { ordering: "Dr. Okafor, the ordering resident, now in the ICU", attending: "Dr. Reyes, the discharging attending, as the responsible clinician", shared: "Dr. Reyes as the responsible clinician, with a faxed copy to Dr. Kim", team: "the results follow-up team's queue" }[cfg.owner];
+  add(4, "Day 4 · 09:41", "Result routed", "The final read goes to " + recip + "." + (ctx ? " The team's note travels with it." : ""), ["delivered"], "E5", ["owner", "context"]);
+
+  // The hospital task is tracked separately from the clinical plan.
+  let holder = { ordering: "Dr. Okafor", attending: "Dr. Reyes", shared: "Dr. Reyes", team: "the results team queue" }[cfg.owner];
+  let ackDay = null; // day an acknowledgment closed the hospital task without a plan
+  const cands = [];
+  let missReason = "";
+  const PLAN = "Follow-up chest CT ordered; plan sent to Dr. Kim";
+  if (cfg.owner === "ordering") {
+    const d = stress ? 11 : 6, when = stress ? "Day 11" : "Day 6 · 23:15";
+    add(d, when, stress ? "Resident opens it after vacation" : "Resident opens it in the ICU",
+      disp ? "Dr. Okafor is now in the ICU and no longer caring for Mr. Hale. No handoff tells him the follow-up is his, so he acknowledges it and defers it. The task cannot close without a disposition, so it stays open in his inbox."
+           : "Dr. Okafor is now in the ICU and no longer caring for Mr. Hale. No handoff tells him the follow-up is his. He acknowledges it to clear his inbox and defers it, and the acknowledgment closes the task with no plan.",
+      ["seen"], "E6", ["closure"]);
+    if (!disp) ackDay = d;
+    missReason = disp ? "The task stayed open with a resident who had deferred it, and no rule moved it to someone who would act." : "The result reached a resident no longer caring for the patient, with no handoff, and his acknowledgment closed the task without a plan.";
+  } else if (cfg.owner === "attending" || cfg.owner === "shared") {
+    const shared = cfg.owner === "shared";
+    if (stress) {
+      if (shared) add(5, "Day 5", "PCP office files the copy", "Dr. Kim's staff scan the faxed report into the chart as an outside record. No task is created for Dr. Kim.", [], null, ["owner"]);
+      if (disp) {
+        add(4, "Day 4 · 09:41", "Task waits in an empty inbox", "Dr. Reyes is on vacation. The task cannot close without a disposition, so it stays open, assigned to her.", [], null, ["owner", "closure"]);
+        cands.push({ day: 13, when: "Day 13", title: "Attending returns and documents a disposition", detail: "Dr. Reyes comes back to a pile of open result tasks, reaches this one, acknowledges it, orders the follow-up CT, and sends the plan to Dr. Kim.", by: "the discharging attending", received: "Dr. Reyes", accepted: "Dr. Reyes, on her return", prompt: "The open task still waiting in her inbox", disposition: PLAN, closesTask: true, states: ["seen", "owned", "resolved"], cause: ["owner", "closure"] });
+      } else {
+        add(13, "Day 13", "Attending clears her inbox after vacation", "Dr. Reyes returns to a full inbox." + (shared ? " She sees Dr. Kim was copied and assumes primary care will arrange the scan." : "") + " She acknowledges, and the task closes with no plan.", ["seen"], "E6", ["owner"]);
+        ackDay = 13;
+        missReason = shared ? "Two clinicians received the result, and each assumed the other would act." : "The responsible clinician was away, and the acknowledgment on her return closed the task without a plan.";
+      }
+    } else {
+      if (disp) {
+        add(4, "Day 4 · 17:20", "Attending accepts the task", "Dr. Reyes opens and acknowledges it between clinic patients." + (shared ? " Dr. Kim was copied, but the task is assigned to her." : "") + " It cannot close without a disposition, so she leaves it open for the morning.", ["seen", "owned"], "E6", ["owner", "closure"]);
+        cands.push({ day: 5, when: "Day 5 · 07:30", title: "Attending documents a disposition", detail: "Before clinic, Dr. Reyes orders the follow-up CT and sends the plan to Dr. Kim.", by: "the discharging attending", received: "Dr. Reyes", accepted: "Dr. Reyes, Day 4 at 17:20", prompt: "The task could not close without a disposition, so it stayed on her list", disposition: PLAN, closesTask: true, states: ["resolved"], cause: ["owner", "closure"] });
+      } else {
+        add(4, "Day 4 · 17:20", "Attending acknowledges between clinic patients", "Dr. Reyes opens it." + (shared ? " She sees Dr. Kim was copied and assumes primary care will arrange the scan." : " She means to come back to it after clinic.") + " She acknowledges, and the task closes with no plan.", ["seen"], "E6", ["owner"]);
+        ackDay = 4;
+        missReason = shared ? "Two clinicians received the result, and each assumed the other would act." : "The attending deferred it, the acknowledgment closed the task, and nothing brought it back.";
+      }
+      if (shared) add(5, "Day 5", "PCP office files the copy", "Dr. Kim's staff scan the faxed report into the chart as an outside record. No task is created for Dr. Kim.", [], null, ["owner"]);
+    }
+  } else {
+    const d = stress ? 10 : 5, when = stress ? "Day 10 · 08:15" : "Day 5 · 08:15";
+    if (stress) add(5, "Days 5 to 9", "Queue untouched", "The results nurse is out sick and there is no backup. The item waits in the queue.", [], null, ["owner"]);
+    if (ctx) {
+      add(d, when, "Nurse acts on the team's note", "The nurse acknowledges the item and reads the team's note, which says anything beyond pneumonia needs follow-up. She routes it to the physician on results duty.", ["seen", "owned"], "E6", ["owner", "context"]);
+      cands.push({ day: d, when: stress ? "Day 10 · 13:00" : "Day 5 · 13:00", title: "Physician on results duty documents a disposition", detail: "Orders the follow-up chest CT and sends the plan to Dr. Kim. The nurse calls Mr. Hale.", by: "the results team", received: "The results follow-up team", accepted: "The physician on results duty", prompt: "The team's note said what to do if the read was abnormal", disposition: PLAN + "; patient called", closesTask: true, states: ["resolved"], cause: ["owner", "context"] });
+    } else if (disp) {
+      add(d, when, "Disposition forces a full read", "The nurse acknowledges the item, but it cannot close without a disposition. She reads the whole impression, finds the recommendation on the last line, and routes it to the physician on results duty.", ["seen", "owned"], "E6", ["owner", "closure"]);
+      cands.push({ day: d + 1, when: "Day " + (d + 1), title: "Physician on results duty documents a disposition", detail: "Reviews the chart to work out why the CT was ordered, orders the follow-up CT, and sends the plan to Dr. Kim.", by: "the results team", received: "The results follow-up team", accepted: "The physician on results duty", prompt: "Closing the item required a full read, which surfaced the recommendation", disposition: PLAN, closesTask: true, states: ["resolved"], cause: ["owner", "closure"] });
+    } else {
+      add(d, when, "Batch acknowledgment", "The impression begins with the pneumonia and the recommendation is the last line. With no note on why the CT was ordered, the nurse acknowledges it with 20 others.", ["seen"], "E6", ["owner"]);
+      ackDay = d;
+      missReason = "The team received the task but not the reason for the test, and the acknowledgment closed it.";
+    }
+  }
+  if (flagged) {
+    if (ctx) cands.push({ day: cfg.owner === "shared" ? 8 : 9, when: cfg.owner === "shared" ? "Day 8" : "Day 9", title: "PCP documents a disposition from the pending list",
+      detail: "Dr. Kim reads the discharge summary: CT final read pending, with the team's note on what to do if abnormal. " + (cfg.owner === "shared" ? "The faxed copy is already in the chart, so Dr. Kim orders the follow-up CT." : "The office requests the report from the hospital, and Dr. Kim orders the follow-up CT."), by: "the PCP", received: "Dr. Kim, through the discharge summary", accepted: "Dr. Kim", prompt: "The summary listed the CT as pending and said what to do if it was abnormal", disposition: "Follow-up chest CT ordered by Dr. Kim, in outside records", closesTask: false, states: ["owned", "resolved"], cause: ["capture", "context"] });
+    else add(8, "Day 8", "PCP sees a pending CT with no guidance", "The summary lists the CT final read as pending but not why it was ordered or what to watch for. Outside the network, the office cannot see the result and has no reason to chase it.", [], "E7", ["capture"]);
+  } else add(8, "Day 8", "PCP receives the discharge summary", "It lists no pending results.", [], "E7");
+  const openOnDay7 = ackDay === null || ackDay > 7;
+  if (cfg.net === "reassign") {
+    if (openOnDay7) cands.push({ day: 7, when: "Day 7", title: "Stalled task reassigned and dispositioned", detail: "The task has been open more than 3 days, so it moves to the covering hospitalist, who acknowledges it, " + (ctx ? "reads the team's note," : "reviews the chart,") + " and orders the follow-up CT.", by: "the covering hospitalist", received: "The covering hospitalist", accepted: "The covering hospitalist", prompt: "The task had been open more than 3 days", disposition: PLAN, closesTask: true, reassigns: true, states: ["seen", "owned", "resolved"], cause: ["net"] });
+    else add(7, "Day 7", "Reassignment rule finds nothing to move", "Your rule moves only open tasks, and this one is already closed.", [], null, ["net"]);
+  }
+  if (cfg.net === "audit" && auditCatches({ recommendation: true, order: false, noActionDecision: false })) cands.push({ day: 9, when: "Day 9", title: "Weekly audit flags it", detail: "The report lists results with a follow-up recommendation, no follow-up order, and no documented decision that none is needed. Quality staff route this one to a physician, who acknowledges it, orders the CT, documents the disposition on the result, and notifies Dr. Kim.", by: "the weekly audit", received: "Quality staff, then a physician", accepted: "The physician the audit routed it to", prompt: "The weekly report of results with a recommendation, no order, and no documented no-action decision", disposition: PLAN, closesTask: true, states: ["seen", "owned", "resolved"], cause: ["net"] });
+
+  cands.sort((a, b) => a.day - b.day);
+  const win = cands[0] || null;
+  if (win && win.reassigns) holder = "the covering hospitalist";
+  const closedByAck = ackDay !== null && (!win || ackDay <= win.day);
+  const taskOpen = !(win && win.closesTask) && !closedByAck;
+  let events;
+  if (win) {
+    events = evs.filter(e => e.day <= win.day).concat([{ day: win.day, when: win.when, title: win.title, detail: win.detail, states: win.states, ref: null, cause: (win.cause || []).filter(k => cfg[k] !== CURRENT_CFG[k]), win: true }]);
+    if (!win.closesTask) events.push({ day: win.day, when: win.when, title: taskOpen ? "Hospital task still open" : "Hospital task already closed", detail: taskOpen ? "Dr. Kim's order is in outside records the hospital cannot see. Nothing links it back, so the hospital task stays open with " + holder + "." : "The hospital task closed earlier when it was acknowledged without a plan. Dr. Kim's order is in outside records, so the hospital record still shows no plan.", states: [], ref: null, cause: [] });
+  } else {
+    if (taskOpen) add(30, "Day 30", "Task still open", "The task is still open with " + holder + ". Nothing moves it.", [], null);
+    add(420, "Month 14", "Mass found", "Mr. Hale presents with hemoptysis, as before. An earlier disposition would have been a plan, not a guarantee of a different finding.", [], "E8");
+    events = evs;
+  }
+  events = events.map((e, i) => ({ ...e, i })).sort((a, b) => a.day - b.day || a.i - b.i);
+  const work = LEVERS.reduce((s, l) => s + optOf(l.key, cfg[l.key]).work, 0);
+  const workLabel = work === 0 ? "No" : work <= 2 ? "Light" : work <= 5 ? "Moderate" : "Heavy";
+  const firstChange = events.find(e => e.cause.length);
+  let outcome;
+  if (!win) outcome = { kind: "missed", label: "No disposition documented", text: missReason || "No one accepted the follow-up and acted on it." };
+  else {
+    const n = win.day - 4, within = n <= TARGET_DAYS;
+    outcome = { kind: within ? "done" : "late", label: "Disposition documented on Day " + win.day + (within ? "" : " · beyond the " + TARGET_DAYS + "-day target"),
+      text: "Documented " + n + " day" + (n === 1 ? "" : "s") + " after the final read, by " + win.by + ". This shows a documented plan, not that the scan happened or what it would have found."
+        + (within ? "" : " The lab's " + TARGET_DAYS + "-day response target is a teaching choice, not an established standard, and it is separate from the 6 to 12 month interval for the scan itself. A delay of days matters little for this nodule but could matter for a time-sensitive result.") };
+  }
+  const openTasks = (win && win.closesTask) ? "None. The disposition closed the hospital task."
+    : closedByAck ? "None, but only because an acknowledgment closed it without a plan" + (win ? ". Dr. Kim's plan is in outside records." : ".")
+    : "1, still open with " + holder + (win ? ". Dr. Kim's plan is in outside records the hospital cannot see." : ".");
+  const received = { ordering: "Dr. Okafor", attending: "Dr. Reyes", shared: "Dr. Reyes, with a copy to Dr. Kim", team: "The results follow-up team" }[cfg.owner];
+  const trace = win ? { received: win.received, accepted: win.accepted, prompt: win.prompt, disposition: win.disposition } : { received, accepted: "No one", prompt: "Nothing", disposition: "None" };
+  return { events, outcome, planDay: win ? win.day : null, by: win ? win.by : "", trace, work, workLabel, openTasks, taskOpen, closedByAck, pcpWin: !!(win && !win.closesTask),
+    firstRef: firstChange ? (firstChange.ref || "new") : null,
+    workload: LEVERS.map(l => optOf(l.key, cfg[l.key]).workText).filter(Boolean) };
+}
+
+function validateLab(l) {
+  const errs = [], stateIds = new Set(l.states.map(s => s.id)), evIds = new Set(l.events.map(e => e.id));
+  l.events.forEach(e => e.states.forEach(s => { if (!stateIds.has(s)) errs.push(e.id + " uses unknown state " + s); }));
+  if (!l.central.options.some(o => o.v === "accepted")) errs.push("Central question has no accepted answer");
+  l.central.options.forEach(o => o.cites.forEach(id => { if (!evIds.has(id)) errs.push("Central option " + o.key + " cites missing " + id); }));
+  l.questions.forEach(q => {
+    if (!q.options.some(o => o.v === "accepted")) errs.push(q.id + " has no accepted answer");
+    [...q.evidence.must, ...q.evidence.anyOf].forEach(id => { if (!evIds.has(id)) errs.push(q.id + " cites missing " + id); });
+  });
+  l.levers.forEach(lv => { if (lv.options.filter(o => o.current).length !== 1) errs.push(lv.key + " needs exactly one current option"); lv.options.forEach(o => { if (!o.short) errs.push(lv.key + "." + o.key + " has no short label"); }); });
+  const combos = l.levers.reduce((acc, lv) => acc.flatMap(c => lv.options.map(o => ({ ...c, [lv.key]: o.key }))), [{}]);
+  combos.forEach(c => [false, true].forEach(st => { try { const r = simulate(c, st); r.events.forEach(e => e.states.forEach(s => { if (!stateIds.has(s)) errs.push(cfgKey(c) + " uses unknown state " + s); })); } catch (e) { errs.push(cfgKey(c) + (st ? " stress" : "") + " failed: " + e.message); } }));
+  return errs;
+}
+function modelChecks() {
+  const cur = { ...CURRENT_CFG }, out = [];
+  out.push({ q: "Can reassignment catch a task after an acknowledgment closes it?", a: "No. With the clinician present, the acknowledgment closes the task, so reassignment finds nothing to move.", pass: simulate({ ...cur, owner: "attending", net: "reassign" }, false).outcome.kind === "missed" });
+  out.push({ q: "Does the final read still route when it was never flagged as pending?", a: "Yes. The final read is routed in every design and both scenarios, as in the original incident.", pass: ALL_CFGS.every(c => [false, true].every(st => simulate(c, st).events.some(e => e.states.includes("delivered")))) });
+  out.push({ q: "Does copying the PCP count as an accepted handoff?", a: "No. A copy creates awareness only. Responsibility is accepted only when someone takes the task.", pass: ![false, true].some(st => simulate({ ...cur, owner: "shared" }, st).events.some(e => e.states.includes("owned"))) });
+  out.push({ q: "Does the weekly audit leave a documented no-action decision closed?", a: "Yes. It flags only results with a recommendation, no follow-up order, and no documented decision that none is needed.", pass: !auditCatches({ recommendation: true, order: false, noActionDecision: true }) && auditCatches({ recommendation: true, order: false, noActionDecision: false }) });
+  const pcpRuns = ALL_CFGS.flatMap(c => [false, true].map(st => simulate(c, st))).filter(r => r.pcpWin);
+  out.push({ q: "When the outside PCP documents a plan, does the hospital task close by itself?", a: "No. Dr. Kim's order is in outside records. The hospital task stays open unless an acknowledgment already closed it, and the replay says which.", pass: pcpRuns.length > 0 && pcpRuns.every(r => r.taskOpen !== r.closedByAck && !r.openTasks.startsWith("None. The disposition")) });
+  const flips = ALL_CFGS.filter(c => simulate(c, false).outcome.kind === "missed" && simulate(c, true).planDay);
+  out.push({ q: "Why do some designs do better when the clinician is away?", a: "Only designs that combine acknowledgment closure with reassignment (" + flips.length + " of " + ALL_CFGS.length + "). Absence keeps the task open long enough for reassignment to move it; with the clinician present, the acknowledgment closes it first.", pass: flips.length > 0 && flips.every(c => c.closure === "ack" && c.net === "reassign") });
+  return out;
+}
+const LAB_ERRORS = validateLab(LAB);
+const MODEL_CHECKS = modelChecks();
+function engineChecks() {
+  const out = [];
+  out.push(["Unchanged correction is rejected", !!correctionProblem("Patient denies chest pain.", "Patient denies chest pain.") && !!correctionProblem("x", "  ") && !correctionProblem("Patient denies chest pain.", "Reports exertional chest tightness.")]);
+  const saved = { a: L.answers, c: L.cites, o: L.opened };
+  L.answers = { Q0: "discharge" }; L.cites = { Q0: ["E8"] };
+  const cv = centralVerdict();
+  out.push(["Unsupported evidence is never styled as accepted", !!cv && cv.cls !== "accepted" && !cv.ready]);
+  L.answers = saved.a; L.cites = saved.c; L.opened = saved.o;
+  const savedSnaps = L.snaps, savedR = L.rationale, savedPred = L.pred, savedReasons = L.reasons;
+  L.snaps = []; L.pred = {}; L.reasons = []; L.rationale = "First reason"; takeSnap("k1", "base"); L.rationale = "Second reason"; takeSnap("k2", "base");
+  out.push(["Each design keeps its own reasoning", latestSnap("k1").rationale === "First reason" && latestSnap("k2").rationale === "Second reason"]);
+  out.push(["New replays start as unfinished", L.snaps.every(sn => sn.completed === false)]);
+  L.snaps = savedSnaps; L.rationale = savedR; L.pred = savedPred; L.reasons = savedReasons;
+  return out;
+}
+MODEL_CHECKS.filter(c => !c.pass).forEach(c => LAB_ERRORS.push("Model check failed: " + c.q));
+if (LAB_ERRORS.length) console.warn("Lab validation:", LAB_ERRORS);
+
+let ACTIVE = store.get("provlab:active") === "case" ? "case" : "lab";
+const labKey = () => "provlab:" + LAB.id + ":" + LAB.version;
+const labFresh = () => ({ screen: "home", opened: [], ev: null, answers: {}, cites: {}, cfg: { ...CURRENT_CFG }, rationale: "", pred: {}, combo: "", stress: false, step: 0, tried: [], stressTried: [], snaps: [], reasons: [], reflection: "", log: [], start: null, copied: false, resume: "", openLever: "" });
+let L = Object.assign(labFresh(), store.get(labKey()) || {});
+function labSave() { const { copied, ...rest } = L; store.set(labKey(), rest); store.set("provlab:active", ACTIVE); }
+function labStamp() { if (!L.start) return "00:00"; const s = Math.floor((Date.now() - L.start) / 1000); return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }
+function labLog(action, detail) { L.log.push({ t: labStamp(), action, detail: detail || "" }); }
+function labSet(patch) { Object.assign(L, patch); labSave(); render(); }
+const OUTCOME_CLASS = { missed: "not", late: "partial", done: "accepted" };
+const designList = () => L.tried.filter(x => x !== BASE_KEY);
+const designName = k => k === BASE_KEY ? "Current hospital design" : "Design " + (designList().includes(k) ? designList().indexOf(k) + 1 : designList().length + 1);
+const changeTags = cfg => { const ch = changedLevers(cfg); return ch.length ? ch.map(l => optOf(l.key, cfg[l.key]).short) : ["No changes"]; };
+const isPilot = () => L.tried.length === 0;
+const rationaleText = () => [...(L.reasons || []).map(i => LAB.reasons[i]), L.rationale.trim()].filter(Boolean).join("; ");
+const hasRationale = () => (L.reasons || []).length > 0 || L.rationale.trim().length >= 10;
+function redesignTodo() {
+  const ch = changedLevers(L.cfg), pilot = isPilot(), pred = L.pred[cfgKey(L.cfg)] || {};
+  const items = [];
+  if (pilot) items.push({ text: ch.length > PILOT_MAX ? "Change no more than " + PILOT_MAX + " rules (you changed " + ch.length + ")" : "Change 1 or " + PILOT_MAX + " rules", done: ch.length >= 1 && ch.length <= PILOT_MAX });
+  items.push({ text: "Pick at least one reason this design fits, or write your own", done: hasRationale() });
+  if (pilot) items.push({ text: "Predict which event will change first", done: !!pred.ev });
+  return items;
+}
+const latestSnap = k => [...(L.snaps || [])].reverse().find(sn => sn.key === k && sn.scenario === "base");
+const predText = ev => (PREDICT_OPTS.find(p => p[0] === ev) || [null, ev === "E4" ? "The final read" : "Another step"])[1];
+function takeSnap(key, scenario) {
+  L.snaps = L.snaps || [];
+  L.snaps.push(scenario === "base" ? { key, scenario, rationale: rationaleText(), pred: { ...(L.pred[key] || {}) }, at: labStamp(), completed: false } : { key, scenario, at: labStamp(), completed: false });
+}
+const evTitle = id => (LAB.events.find(e => e.id === id) || {}).title || id;
+
+const EXPL_LABEL = { accepted: "Defensible explanation", partial: "Partly right", not: "Not where it began" };
+function centralVerdict() {
+  const opt = LAB.central.options.find(o => o.key === L.answers.Q0), ec = centralCheck();
+  if (!opt || !ec) return null;
+  const cls = opt.v === "not" ? "not" : ec[0] === "not" ? "partial" : opt.v;
+  const head = EXPL_LABEL[opt.v] + "; " + (ec[0] === "accepted" ? "evidence supports it" : "evidence does not support it yet");
+  return { opt, ec, cls, head, ready: opt.v !== "not" && ec[0] === "accepted" };
+}
+const investigationReady = () => !!(centralVerdict() || {}).ready;
+
+function centralCheck() {
+  const C0 = LAB.central, opt = C0.options.find(o => o.key === L.answers.Q0), sel = L.cites.Q0 || [];
+  if (!opt || !sel.length) return null;
+  const hits = opt.cites.filter(id => sel.includes(id));
+  return hits.length ? ["accepted", "Your evidence supports this explanation (" + hits.join(", ") + ")."] : ["not", "The events you cited do not show this. Look at " + opt.cites.join(" and ") + "."];
+}
+
+function chain(lit, finished, title, showAfter) {
+  return `<div class="chain-wrap"><p class="label">${esc(title)}</p><div class="chain">${LAB.states.map((s, i) => {
+    const cls = lit.has(s.id) ? "on" : finished ? "miss" : "";
+    return (i ? `<span class="arr" aria-hidden="true">›</span>` : "") + `<span class="st ${cls}">${esc(s.label)}${cls === "miss" ? " · not recorded" : ""}</span>`;
+  }).join("")}${showAfter ? `<span class="arr" aria-hidden="true">›</span><span class="st out" title="Outside this replay">${esc(LAB.afterState)} · beyond this replay</span>` : ""}</div></div>`;
+}
+
+function labTop() {
+  return `<header class="bar">
+    <div class="brand"><h1>Provenance Lab</h1><span class="mono">${esc(LAB.id)} v${esc(LAB.version)}</span></div>
+    <div class="bar-meta">
+      ${LAB.reviewStatus !== "approved" ? `<span class="pill warn">Prototype, not yet clinically reviewed</span>` : ""}
+      <span class="pill">Synthetic patient data</span>
+      <button class="btn ghost" data-lab="home">All modules</button><button class="btn ghost" data-lab="reset">Reset lab</button>
+    </div>
+  </header>`;
+}
+
+function stepper() {
+  const steps = [["investigate", "Investigate"], ["redesign", "Redesign"], ["replay", "Replay and compare"], ["debrief", "Debrief"]];
+  const cur = L.screen === "brief" ? -1 : steps.findIndex(s => s[0] === L.screen);
+  return `<ol class="stepper">${steps.map(([k, n], i) => `<li class="${i === cur ? "cur" : i < cur ? "done" : ""}"><span class="mono">${i + 1}</span>${n}</li>`).join("")}</ol>`;
+}
+
+function patientBar() {
+  const P = LAB.patient;
+  return `<div class="patient"><strong>${esc(P.name)}</strong><span>${P.age} ${esc(P.sex)}</span><span class="mono">MRN ${esc(P.mrn)}</span><span>${esc(P.context)}</span><span class="mode lab">Workflow lab</span></div>`;
+}
+
+function labView() {
+  const body = L.screen === "brief" ? labBrief() : L.screen === "investigate" ? labInvestigate() : L.screen === "redesign" ? labRedesign() : L.screen === "replay" ? labReplay() : labDebrief();
+  return labTop() + stepper() + patientBar() + body;
+}
+
+function labBrief() {
+  return `<section class="brief panel">
+    <p class="label">Incident report · patient safety committee</p>
+    <h2>${esc(LAB.title)}</h2>
+    ${LAB.brief.map(p => `<p>${esc(p)}</p>`).join("")}
+    <div class="task"><div class="task-text"><p><span class="label">Your role</span>${esc(LAB.role)}</p></div></div>
+    <div><button class="btn primary" data-lab="investigate">Start the investigation</button></div>
+  </section>`;
+}
+
+function labInvestigate() {
+  const lit = new Set(LAB.events.filter(e => L.opened.includes(e.id)).flatMap(e => e.states));
+  const ev = LAB.events.find(e => e.id === L.ev);
+  const unlocked = L.opened.length >= LAB.minOpenForQuestions;
+  const C0 = LAB.central, opt = C0.options.find(o => o.key === L.answers.Q0), sel = L.cites.Q0 || [], ec = centralCheck(), cv = centralVerdict();
+  const done = investigationReady();
+  const showForm = !done || !L.qCollapsed || L.editQ;
+  return `
+  <div class="task"><div class="task-text"><p><span class="label">Step 1 · Investigate</span>Open each event to see where its information came from.</p></div><span class="pill">${L.opened.length} of ${LAB.events.length} events opened</span></div>
+  <div class="panel chain-panel">${chain(lit, false, "States the record can confirm so far")}</div>
+  <div class="lab-grid">
+    <section class="panel" aria-label="Timeline">
+      <div class="pane-head"><span class="label">Timeline</span></div>
+      <div class="pane-body tl">${LAB.events.map(e => `<button class="ev ${L.opened.includes(e.id) ? "opened" : ""}" data-ev="${e.id}" aria-current="${L.ev === e.id}"><span class="mono">${e.id}</span><span><span class="ev-when">${esc(e.when)}</span><strong>${esc(e.title)}</strong><span class="ev-actor">${esc(e.actor)}</span></span><span class="mk">${L.opened.includes(e.id) ? "read" : "open"}</span></button>`).join("")}</div>
+    </section>
+    <section class="panel" aria-label="Evidence">
+      <div class="pane-head"><span class="label">Evidence${ev ? ` · <span class="mono">${ev.id}</span>` : ""}</span></div>
+      <div class="pane-body">${ev ? `<h3 class="ev-title">${esc(ev.title)}</h3><p class="ev-meta">${esc(ev.when)} · ${esc(ev.actor)}</p><p>${esc(ev.detail)}</p>
+        <table class="prov-table"><tbody>${ev.prov.map(([k, v]) => `<tr><th scope="row">${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</tbody></table>` : `<p class="empty">Select an event on the timeline to see its record.</p>`}</div>
+    </section>
+  </div>
+  <section class="panel sec" aria-label="Your finding">
+    <h3>Your finding</h3>
+    ${!unlocked ? `<p class="locked">Open at least ${LAB.minOpenForQuestions} events to unlock the question.</p>` : showForm ? `
+      <fieldset class="q"><legend>${esc(C0.prompt)} <span class="req">Required</span></legend><p class="example-note">More than one answer can be defensible. Pick the one you would argue for, then cite the events that support it.</p>
+        <div class="opts">${C0.options.map(o => `<label class="opt"><input type="radio" name="Q0" id="Q0-${o.key}" value="${o.key}" data-q="Q0" ${L.answers.Q0 === o.key ? "checked" : ""}><span>${esc(o.text)}</span></label>`).join("")}</div>
+        ${opt ? `<div class="cite-row"><span class="label">Evidence</span>${LAB.events.map(e => `<label class="cite-chip ${sel.includes(e.id) ? "sel" : ""}" title="${esc(L.opened.includes(e.id) ? e.title : "Open " + e.id + " on the timeline first")}"><input type="checkbox" id="cite-Q0-${e.id}" data-cite-q="Q0" value="${e.id}" ${sel.includes(e.id) ? "checked" : ""} ${!sel.includes(e.id) && (sel.length >= 3 || !L.opened.includes(e.id)) ? "disabled" : ""}>${e.id}</label>`).join("")}</div>` : ""}
+        ${cv ? `<div class="fb ${cv.cls}"><strong>${esc(cv.head)}</strong><span>${esc(opt.fb)}</span><span class="ref">${esc(ec[1])}</span></div>` : opt ? `<p class="example-note">Cite at least one event you have opened to see feedback.</p>` : ""}
+        ${done && L.editQ ? `<div><button class="btn" data-lab="doneq">Done</button></div>` : ""}
+      </fieldset>` : `
+      <div class="summary-card"><p><span class="v ${cv.cls}">${esc(cv.head)}</span></p><p>${esc(opt.text)}</p><p class="example-note">${esc(opt.fb)}</p><p class="example-note">Evidence cited: ${esc(sel.join(", "))}. ${esc(ec[1])}</p><button class="btn ghost" style="justify-self:start;padding:2px 0" data-lab="editq">Change my answer</button></div>`}
+    ${unlocked ? `<details class="optional-q"><summary>Optional: two more questions about the record (not needed to continue)</summary>${LAB.questions.map(q => {
+      const a = L.answers[q.id], o2 = a ? q.options.find(x => x.key === a) : null;
+      return `<fieldset class="q"><legend>${esc(q.prompt)}</legend><div class="opts">${q.options.map(o => `<label class="opt"><input type="radio" name="${q.id}" id="${q.id}-${o.key}" value="${o.key}" data-q="${q.id}" ${a === o.key ? "checked" : ""}><span>${esc(o.text)}</span></label>`).join("")}</div>${o2 ? `<div class="fb ${o2.v}"><strong>${VERDICT_LABEL[o2.v]}</strong><span>${esc(o2.fb)}</span></div>` : ""}</fieldset>`;
+    }).join("")}</details>` : ""}
+    ${todoList([
+      { text: "Open at least " + LAB.minOpenForQuestions + " events on the timeline (" + Math.min(L.opened.length, LAB.minOpenForQuestions) + " of " + LAB.minOpenForQuestions + ")", done: L.opened.length >= LAB.minOpenForQuestions },
+      { text: "Choose where the process first broke down", done: !!opt && opt.v !== "not" },
+      { text: "Cite at least one event that supports your answer", done: !!(cv && cv.ec[0] === "accepted") }
+    ])}
+    <div><button class="btn primary" data-lab="redesign" ${done ? "" : "disabled"}>Continue to redesign</button></div>
+  </section>`;
+}
+
+function labRedesign() {
+  const cfg = L.cfg, ch = changedLevers(cfg), sim = simulate(cfg, false), key = cfgKey(cfg);
+  const pilot = isPilot(), over = pilot && ch.length > PILOT_MAX, none = ch.length === 0;
+  const pred = L.pred[key] || {};
+  const todo = redesignTodo(), ready = todo.every(i => i.done);
+  const open = L.openLever || LEVERS[0].key;
+  return `
+  <div class="task"><div class="task-text"><p><span class="label">Step 2 · Redesign</span>${pilot ? `Pilot: you can change ${PILOT_MAX} rules. Choose which failures to address first.` : "Pilot done. Change as many rules as you like."} Click an option to see its tradeoffs.</p></div><span class="pill ${over ? "warn" : ""}">${pilot ? ch.length + " of " + PILOT_MAX + " pilot changes used" : ch.length + " rule" + (ch.length === 1 ? "" : "s") + " changed"} · ${sim.workLabel.toLowerCase()} added work</span></div>
+  <div class="levers">${LEVERS.map((lv, n) => {
+    const sel = optOf(lv.key, cfg[lv.key]), isOpen = open === lv.key;
+    return `<section class="panel lever ${isOpen ? "open" : ""}">
+      <div class="lever-head"><span class="mono lever-n">${n + 1}</span><div><h3>${esc(lv.q)}</h3><span class="finding">Finding: ${esc(lv.finding)}</span></div></div>
+      <div class="chips-row" role="radiogroup" aria-label="${esc(lv.q)}">${lv.options.map(o => `<label class="chip-opt ${cfg[lv.key] === o.key ? "sel" : ""}"><input type="radio" name="lv-${lv.key}" id="lv-${lv.key}-${o.key}" value="${o.key}" data-lever="${lv.key}" ${cfg[lv.key] === o.key ? "checked" : ""}>${esc(o.short)}${o.current ? `<span class="cur-dot" title="Current hospital setting">current</span>` : ""}</label>`).join("")}</div>
+      ${isOpen ? `<div class="lever-detail">
+        <p class="lever-full">${esc(sel.label)}</p>
+        <ul class="pc">${sel.pros.map(p => `<li class="pro">${esc(p)}</li>`).join("")}${sel.cons.map(c => `<li class="con">${esc(c)}</li>`).join("")}</ul>
+        ${sel.work ? `<p class="work">Added work: ${esc(sel.workText)}</p>` : ""}
+        <details><summary>Why this rule matters</summary><p class="example-note">${esc(lv.why)}</p><p class="example-note"><strong>Evidence:</strong> ${esc(lv.evidence)}</p></details>
+      </div>` : `<button class="btn ghost lever-more" data-open-lever="${lv.key}">Show tradeoffs</button>`}
+    </section>`;
+  }).join("")}</div>
+  <section class="panel sec">
+    <fieldset class="q"><legend>Why does this design fit this hospital? <span class="req">Required</span></legend>
+      <p class="example-note">Pick at least one reason, or write your own.</p>
+      <div class="reason-row">${LAB.reasons.map((r, i) => `<label class="chip-opt ${(L.reasons || []).includes(i) ? "sel" : ""}"><input type="checkbox" id="reason-${i}" data-reason="${i}" ${(L.reasons || []).includes(i) ? "checked" : ""}>${esc(r)}</label>`).join("")}</div>
+      <label for="rationale" class="label">In your own words <span class="opt-tag">Optional</span></label>
+      <textarea id="rationale" data-rationale placeholder="One or two sentences.">${esc(L.rationale)}</textarea>
+    </fieldset>
+    ${pilot ? "" : `<details class="optional-q"${pred.ev ? " open" : ""}><summary>Optional: make a prediction for this replay</summary>`}<fieldset class="q predict"><legend>${pilot ? "Before you replay: which" : "Which"} event should change first under your design? ${pilot ? '<span class="req">Required</span>' : ""}</legend>
+      <div class="opts">${PREDICT_OPTS.map(([v, t]) => `<label class="opt"><input type="radio" name="pred" id="pred-${v}" value="${v}" data-pred ${pred.ev === v ? "checked" : ""}><span>${esc(t)}</span></label>`).join("")}</div>
+      <label for="pred-risk" class="label">What could still fail? <span class="opt-tag">Optional</span></label>
+      <textarea id="pred-risk" data-pred-risk placeholder="Optional. One sentence.">${esc(pred.risk || "")}</textarea>
+    </fieldset>${pilot ? "" : "</details>"}
+    <details><summary>About the numbers</summary><p class="example-note">${esc(LAB.volumeNote)}</p></details>
+    ${todoList(todo)}
+    <div class="actions-row"><button class="btn primary" data-lab="run" ${ready ? "" : "disabled"}>${pilot ? "Run the pilot replay" : L.tried.includes(key) ? "Replay this design again" : "Replay the incident"}</button><button class="btn" data-lab="current">Reset to current</button>${L.tried.length ? `<button class="btn ghost" data-lab="compare">Compare designs so far</button>` : ""}<button class="btn ghost" data-lab="investigate">Back to the evidence</button></div>
+  </section>`;
+}
+
+function tradeoffLine(k) {
+  const b = simulate(keyCfg(k), false), parts = [];
+  parts.push(b.planDay ? "disposition by Day " + b.planDay : "no disposition");
+  parts.push(b.workLabel.toLowerCase() + " added work");
+  if (L.stressTried.includes(k)) { const s = simulate(keyCfg(k), true); parts.push(!s.planDay ? "breaks when the clinician is away" : b.planDay && s.planDay - b.planDay <= 2 ? "holds when the clinician is away" : "slows to Day " + s.planDay + " when the clinician is away"); }
+  else if (k !== BASE_KEY) parts.push("not stress-tested yet");
+  const t = parts.join(", ");
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+function compareView(highlight) {
+  const keys = [BASE_KEY, ...designList()];
+  const card = k => {
+    const cfg = keyCfg(k), b = simulate(cfg, false), ch = changedLevers(cfg);
+    const st = L.stressTried.includes(k) ? simulate(cfg, true) : null;
+    const pros = [...new Set(ch.flatMap(l => optOf(l.key, cfg[l.key]).pros))].slice(0, 4);
+    const cons = [...new Set((ch.length ? ch : LEVERS).flatMap(l => optOf(l.key, cfg[l.key]).cons))].slice(0, 4);
+    return `<article class="cmp ${k === highlight ? "hl" : ""}">
+      <header><strong>${esc(designName(k))}</strong>${k === highlight ? `<span class="cur-tag">This replay</span>` : ""}</header>
+      <p class="tradeoff">${esc(tradeoffLine(k))}</p>
+      <div class="cmp-out"><span class="label">Base</span><span class="v ${OUTCOME_CLASS[b.outcome.kind]}">${esc(b.outcome.label)}</span></div>
+      ${st ? `<div class="cmp-out"><span class="label">Stress</span><span class="v ${OUTCOME_CLASS[st.outcome.kind]}">${esc(st.outcome.label)}</span></div>` : ""}
+      <div class="chg-chips">${changeTags(cfg).map(c => `<span class="mini">${esc(c)}</span>`).join("")}</div>
+      ${(() => { const sn = latestSnap(k); if (!sn) return ""; return `<p class="cmp-why"><span class="label">Your reasoning</span> ${esc(sn.rationale || "(none recorded)")}</p>${sn.pred && sn.pred.ev ? `<p class="cmp-why"><span class="label">Prediction</span> ${esc(predText(sn.pred.ev))}${b.firstRef ? (sn.pred.ev === b.firstRef ? " · matched the replay" : " · the replay changed " + esc(predText(b.firstRef).toLowerCase()) + " first") : ""}</p>` : ""}`; })()}
+      <details><summary>Pros and cons</summary><ul class="pc">${pros.map(p => `<li class="pro">${esc(p)}</li>`).join("")}${cons.map(c => `<li class="con">${esc(c)}</li>`).join("")}</ul></details>
+    </article>`;
+  };
+  return `<section class="panel sec" aria-label="Compare designs">
+    <h3>Compare designs</h3>
+    <p class="example-note">No design wins everywhere. Each line names what the design gains and what it costs.</p>
+    <div class="cmp-grid">${keys.map(card).join("")}</div>
+  </section>`;
+}
+
+function labReplay() {
+  const cfg = keyCfg(L.combo), R = simulate(cfg, L.stress);
+  const shown = R.events.slice(0, L.step + 1), done = L.step >= R.events.length - 1;
+  const lit = new Set(shown.flatMap(e => e.states));
+  const pred = L.pred[L.combo] || {};
+  const lbl = k => optOf(k, cfg[k]).short;
+  const snapPred = (latestSnap(L.combo) || {}).pred || pred;
+  const predTxt = predText(snapPred.ev);
+  const actualTxt = R.firstRef ? predText(R.firstRef) : "Nothing changed";
+  const groups = ["literature", "scenario"].map(g => ({ g, items: LAB.assumptions.filter(a => a.basis === g) }));
+  return `
+  <div class="task"><div class="task-text"><p><span class="label">Step 3 · ${L.stress ? "Stress test" : "Replay"}</span>${L.stress ? esc(LAB.stress.text) : "Same result, same people, your rules."}</p><div class="chg-chips">${changeTags(cfg).map(c => `<span class="mini">${esc(c)}</span>`).join("")}</div></div><span class="pill">Event ${L.step + 1} of ${R.events.length}</span></div>
+  <div class="panel chain-panel">${chain(lit, done, L.stress ? "Under this design, with the clinician away" : "Under this design", true)}</div>
+  <section class="panel sec">
+    <ol class="replay">${shown.map((e, i) => `<li class="${i === L.step ? "new" : ""} ${e.win ? "win" : ""}"><span class="ev-when">${esc(e.when)}</span><strong>${esc(e.title)}</strong>${e.cause.length ? `<span class="because">Changed by your rule${e.cause.length > 1 ? "s" : ""}: ${esc(e.cause.map(lbl).join(", "))}</span>` : ""}${i === L.step || e.win ? `<p>${esc(e.detail)}</p>` : ""}</li>`).join("")}</ol>
+    ${done ? "" : `<div class="actions-row"><button class="btn primary" data-lab="next">Next event</button><button class="btn ghost" data-lab="skip">Skip to the outcome</button></div>`}
+  </section>
+  ${done ? `<section class="panel sec outcome">
+    <div class="fb ${OUTCOME_CLASS[R.outcome.kind]}"><strong>${esc(R.outcome.label)}</strong><span>${esc(R.outcome.text)}</span></div>
+    <dl class="trace"><dt>Received the task</dt><dd>${esc(R.trace.received)}</dd><dt>Accepted responsibility</dt><dd>${esc(R.trace.accepted)}</dd><dt>What prompted action</dt><dd>${esc(R.trace.prompt)}</dd><dt>Disposition documented</dt><dd>${esc(R.trace.disposition)}</dd><dt>Open tasks left</dt><dd>${esc(R.openTasks)}</dd></dl>
+    ${L.stress ? `<div class="research-note"><span class="label">Why the stress test came out this way</span><p>${esc(stressWhy(cfg, R))}</p></div>` : ""}
+    ${!L.stress && snapPred.ev ? `<div class="pred-check ${snapPred.ev === R.firstRef ? "match" : ""}"><p><span class="label">Your prediction</span> ${esc(predTxt)}</p><p><span class="label">First change in the replay</span> ${esc(actualTxt)}</p>${snapPred.risk ? `<p><span class="label">What you thought could still fail</span> ${esc(snapPred.risk)}</p>` : ""}</div>` : ""}
+    <details><summary>Added work under this design</summary><ul class="points" style="margin-top:6px">${(R.workload.length ? R.workload : ["No added work beyond the current design."]).map(w => `<li>${esc(w)}</li>`).join("")}</ul><p class="example-note" style="margin-top:6px">Volumes are illustrative.</p></details>
+    <details><summary>How this replay is calculated</summary><p class="example-note" style="margin-top:6px">A teaching model with fixed rules, not a prediction of real-world rates.</p>${groups.map(({ g, items }) => `<p class="label" style="margin-top:8px">${g === "literature" ? "Informed by the literature" : "Scenario assumptions written for this lab"}</p><ul class="points">${items.map(a => `<li>${esc(a.text)}</li>`).join("")}</ul>`).join("")}<p class="label" style="margin-top:8px">Checks on how the rules interact</p><ul class="points">${MODEL_CHECKS.map(c => `<li><strong>${esc(c.q)}</strong> ${esc(c.a)}${c.pass ? "" : " (Check failed.)"}</li>`).join("")}</ul></details>
+  </section>
+  ${compareView(L.combo)}
+  <div class="actions-row">${!L.stress ? `<button class="btn primary" data-lab="stress">Stress test this design</button>` : `<button class="btn" data-lab="base">Back to the base replay</button>`}<button class="btn" data-lab="redesign">Try another design</button><button class="btn ghost" data-lab="debrief">Go to the debrief</button></div>` : ""}`;
+}
+
+function mcBlock(q, ans, scope) {
+  const sel = ans[q.id] || [];
+  const picked = sel.map(i => q.options[i]);
+  let fb = "";
+  if (sel.length) {
+    if (q.multi) {
+      const wrong = picked.some(o => o.v === "not"), all = q.options.every((o, i) => o.v === "not" || sel.includes(i));
+      fb = `<div class="fb ${wrong ? "not" : all ? "accepted" : "partial"}"><strong>${wrong ? "Not quite" : all ? "All of them" : "More to consider"}</strong><span>${esc(q.fb)}</span></div>`;
+    } else { const o = picked[0]; fb = `<div class="fb ${o.v}"><strong>${VERDICT_LABEL[o.v]}</strong><span>${esc(o.fb)}</span></div>`; }
+  }
+  return `<fieldset class="q"><legend>${esc(q.prompt)}</legend><div class="opts">${q.options.map((o, i) => `<label class="opt"><input type="${q.multi ? "checkbox" : "radio"}" name="${scope}-${q.id}" id="${scope}-${q.id}-${i}" data-mc="${scope}|${q.id}|${i}|${q.multi ? 1 : 0}" ${sel.includes(i) ? "checked" : ""}><span>${esc(o.text)}</span></label>`).join("")}</div>${fb}</fieldset>`;
+}
+function bindMC(ans, saveFn, scope) {
+  document.querySelectorAll(`[data-mc^="${scope}|"]`).forEach(inp => inp.onchange = () => {
+    const [, id, i, multi] = inp.dataset.mc.split("|"), n = Number(i), cur = ans[id] || [];
+    ans[id] = multi === "1" ? (inp.checked ? [...new Set([...cur, n])] : cur.filter(x => x !== n)) : [n];
+    saveFn(); render();
+  });
+}
+
+function stressWhy(cfg, R) {
+  const b = simulate(cfg, false);
+  if (!b.planDay && R.planDay) return "The absence kept the task open long enough for " + R.by + " to pick it up on Day " + R.planDay + ". With the clinician present, an acknowledgment closed the task first, so there was nothing left to catch. Systems can detect a task that sits untouched while missing one that was closed without a plan.";
+  if (b.planDay && !R.planDay) return "With the clinician away, nothing else moved the task, so no disposition was documented. In the base replay, " + b.by + " acted on Day " + b.planDay + ".";
+  if (b.planDay && R.planDay && R.planDay > b.planDay) return "The task waited until " + R.by + " acted on Day " + R.planDay + ". In the base replay, " + b.by + " acted on Day " + b.planDay + ". Your design depends on that clinician being there.";
+  if (b.planDay && R.planDay) return "The absence did not change the outcome: " + R.by + " acted on Day " + R.planDay + ", the same as in the base replay. Your design does not depend on one person being available.";
+  return "Neither scenario produced a disposition. The absence changed who held the task, but no rule made anyone act on it.";
+}
+
+function labDebrief() {
+  const origLit = new Set(LAB.events.flatMap(e => e.states));
+  const anyAuto = L.tried.some(k => keyCfg(k).capture === "auto");
+  const last = L.tried[L.tried.length - 1];
+  return `<section class="debrief">
+    <div><p class="label">Step 4 · Debrief</p><h2 style="margin-top:6px">Delivered, acknowledged, and dispositioned are different states</h2></div>
+    <div class="panel sec">
+      ${chain(origLit, true, "The original incident", true)}
+      ${last ? chain(new Set(simulate(keyCfg(last), false).events.flatMap(e => e.states)), true, designName(last) + " (your latest)", true) : ""}
+      <p class="example-note">An acknowledgment records a click. Responsibility is accepted when someone takes the task as theirs. A disposition records the decision. Whether the scan happens months later is a separate step the replay does not show.</p>
+    </div>
+    ${compareView(last)}
+    ${anyAuto ? `<div class="event gap" role="note"><p class="label">A gap some of your designs left open</p><p>${esc(LAB.residualGap)}</p></div>` : ""}
+    <div class="panel sec">
+      <h3>The published question</h3>
+      <p>Dalal and colleagues assigned responsibility to the discharging attending and notified clinicians directly. Documented action came sooner, but the share of actionable results with any documented follow-up did not change significantly, and about 40% had none. Why might explicit responsibility and notification still fail to produce reliable follow-up?</p>
+      <details><summary>Possible reasons</summary><ul class="points" style="margin-top:6px">${LAB.publishedReasons.map(r => `<li>${esc(r)}</li>`).join("")}</ul></details>
+    </div>
+    <div class="panel sec">
+      <h3>Check your understanding</h3>
+      ${LAB.reflectMC.map(q => mcBlock(q, L.refl || (L.refl = {}), "lab")).join("")}
+      <details class="optional-q"><summary>Optional: write your own reflection</summary><ol style="margin:0 0 8px;padding-left:20px;display:grid;gap:4px">${LAB.reflect.map(q => `<li>${esc(q)}</li>`).join("")}</ol><textarea id="lab-reflect" data-lab-reflect placeholder="A few sentences.">${esc(L.reflection)}</textarea></details>
+      <details><summary>Going further: ${esc(LAB.goingFurther.q)}</summary><p class="example-note" style="margin-top:6px">${esc(LAB.goingFurther.example)}</p></details>
+    </div>
+    <details class="panel sec fold">
+      <summary><h3>The research behind this lab</h3></summary>
+      <div class="refs">${LAB.research.map(r => `<div class="ref"><a href="https://doi.org/${esc(r.doi)}" target="_blank" rel="noopener">${esc(r.cite)}</a><p>${esc(r.text)}</p></div>`).join("")}</div>
+    </details>
+    <div class="panel sec">
+      <h3>Session record</h3>
+      <details><summary>Show the action log</summary><div class="log" style="margin-top:6px">${L.log.map(e => `<span>${esc(e.t)}  ${esc(e.action.padEnd(9))} ${esc(e.detail)}</span>`).join("") || "<span>No actions logged.</span>"}</div></details>
+      <div class="actions-row"><button class="btn" data-lab="copy">Copy session summary</button><button class="btn" data-lab="redesign">Try another design</button><button class="btn primary" data-lab="reset">Start the lab over</button><button class="btn ghost" data-lab="home">All modules</button>${L.copied ? `<span class="toast" aria-live="polite">Copied</span>` : ""}</div>
+      <textarea id="copy-fallback" readonly hidden></textarea>
+    </div>
+  </section>`;
+}
+
+function labSummary() {
+  const lines = [`Provenance Lab · ${LAB.id} v${LAB.version}`, ""];
+  const o0 = LAB.central.options.find(x => x.key === L.answers.Q0), ec0 = centralCheck();
+  const cv0 = centralVerdict();
+  lines.push(`Finding: ${o0 ? o0.text : "(unanswered)"} | Evidence: ${(L.cites.Q0 || []).join(", ") || "none"}${cv0 ? " | " + cv0.head : ""}`);
+  LAB.questions.forEach(q => { const o = q.options.find(x => x.key === L.answers[q.id]); if (o) lines.push(`${q.id}: ${o.text} (${VERDICT_LABEL[o.v]})`); });
+  lines.push("", "Replays started, in order (outcomes shown only for replays the learner finished):");
+  (L.snaps || []).forEach((sn, i) => {
+    const r = simulate(keyCfg(sn.key), sn.scenario === "stress");
+    lines.push(`${i + 1}. ${designName(sn.key)}, ${sn.scenario === "stress" ? "stress test" : "base scenario"}: ${changeTags(keyCfg(sn.key)).join("; ")} -> ${sn.completed ? r.outcome.label + ". Open tasks: " + r.openTasks : "started, not finished"}`);
+    if (sn.scenario === "base") {
+      lines.push(`   Reasoning: ${sn.rationale || "(none)"}`);
+      if (sn.pred && sn.pred.ev) lines.push(`   Prediction: ${predText(sn.pred.ev)}.${sn.completed ? " First change in the replay: " + (r.firstRef ? predText(r.firstRef) : "nothing") + "." : ""}${sn.pred.risk ? " Could still fail: " + sn.pred.risk : ""}`);
+    }
+  });
+  const rc = LAB.reflectMC.filter(q => (L.refl || {})[q.id]);
+  if (rc.length) { lines.push("", "Understanding checks:"); rc.forEach(q => lines.push(`- ${q.prompt} ${(L.refl[q.id] || []).map(i => q.options[i].text).join(" | ")}`)); }
+  lines.push("", "Reflection: " + (L.reflection || "(none)"), "", "Log:");
+  L.log.forEach(e => lines.push(`${e.t} ${e.action} ${e.detail}`.trim()));
+  return lines.join("\n");
+}
+
+function bindLab() {
+  document.querySelectorAll("[data-lab]").forEach(b => b.onclick = () => labAct(b.dataset.lab));
+  document.querySelectorAll("[data-ev]").forEach(b => b.onclick = () => {
+    const id = b.dataset.ev;
+    if (!L.opened.includes(id)) { L.opened.push(id); labLog("open", id); }
+    labSet({ ev: id });
+    if (window.innerWidth <= 900) document.querySelector(".lab-grid > section:nth-child(2)")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  document.querySelectorAll("[data-q]").forEach(r => r.onchange = () => { L.answers[r.dataset.q] = r.value; labLog("answer", r.dataset.q + " " + r.value); labSave(); render(); });
+  document.querySelectorAll("[data-cite-q]").forEach(c => c.onchange = () => {
+    const q = c.dataset.citeQ, cur = L.cites[q] || [];
+    L.cites[q] = c.checked ? [...cur, c.value].slice(0, 3) : cur.filter(x => x !== c.value);
+    labSave(); render();
+  });
+  document.querySelectorAll("[data-lever]").forEach(r => r.onchange = () => { L.cfg = { ...L.cfg, [r.dataset.lever]: r.value }; L.openLever = r.dataset.lever; labSave(); render(); });
+  document.querySelectorAll("[data-open-lever]").forEach(b => b.onclick = () => labSet({ openLever: b.dataset.openLever }));
+  document.querySelectorAll("[data-pred]").forEach(r => r.onchange = () => { const k = cfgKey(L.cfg); L.pred[k] = { ...(L.pred[k] || {}), ev: r.value }; labSave(); render(); });
+  const pr = document.querySelector("[data-pred-risk]");
+  if (pr) pr.oninput = () => { const k = cfgKey(L.cfg); L.pred[k] = { ...(L.pred[k] || {}), risk: pr.value }; labSave(); };
+  document.querySelectorAll("[data-reason]").forEach(c => c.onchange = () => {
+    const i = Number(c.dataset.reason), cur = L.reasons || [];
+    L.reasons = c.checked ? [...new Set([...cur, i])] : cur.filter(x => x !== i);
+    labSave(); render();
+  });
+  const ra = document.querySelector("[data-rationale]");
+  if (ra) ra.oninput = () => {
+    const before = hasRationale();
+    L.rationale = ra.value; labSave();
+    if (before !== hasRationale()) render();
+  };
+  const rf = document.querySelector("[data-lab-reflect]"); if (rf) rf.oninput = () => { L.reflection = rf.value; labSave(); };
+  if (ACTIVE === "lab" && L.screen === "debrief") bindMC(L.refl || (L.refl = {}), labSave, "lab");
+}
+
+function labAct(a) {
+  const top = () => window.scrollTo(0, 0);
+  if (a === "home") { if (L.screen !== "home") L.resume = L.screen; L.screen = "home"; labSave(); render(); top(); }
+  else if (a === "begin") { if (!L.start) { L.start = Date.now(); labLog("start"); } labSet({ screen: L.resume || "brief" }); top(); }
+  else if (a === "investigate") { labSet({ screen: "investigate" }); top(); }
+  else if (a === "editq") { labSet({ editQ: true }); }
+  else if (a === "doneq") { labSet({ editQ: false }); }
+  else if (a === "redesign") { if (investigationReady()) L.qCollapsed = true; labSet({ screen: "redesign", editQ: false }); top(); }
+  else if (a === "current") { labSet({ cfg: { ...CURRENT_CFG } }); }
+  else if (a === "compare") { if (L.tried.length) { const k = L.tried[L.tried.length - 1]; L.combo = k; L.stress = false; L.step = simulate(keyCfg(k), false).events.length - 1; labSet({ screen: "replay" }); } top(); }
+  else if (a === "run") { const k = cfgKey(L.cfg); labLog(isPilot() ? "pilot" : "replay", changeTags(L.cfg).join("; ")); takeSnap(k, "base"); labSet({ screen: "replay", combo: k, stress: false, step: 0 }); top(); }
+  else if (a === "stress") { labLog("stress", designName(L.combo)); takeSnap(L.combo, "stress"); labSet({ stress: true, step: 0 }); top(); }
+  else if (a === "base") { L.stress = false; L.step = simulate(keyCfg(L.combo), false).events.length - 1; labSave(); render(); top(); }
+  else if (a === "next" || a === "skip") {
+    const R = simulate(keyCfg(L.combo), L.stress);
+    L.step = a === "skip" ? R.events.length - 1 : Math.min(L.step + 1, R.events.length - 1);
+    if (L.step === R.events.length - 1) {
+      const sc = L.stress ? "stress" : "base", open = [...(L.snaps || [])].reverse().find(sn => sn.key === L.combo && sn.scenario === sc && !sn.completed);
+      if (open) open.completed = true;
+      const list = L.stress ? L.stressTried : L.tried;
+      if (!list.includes(L.combo)) { list.push(L.combo); labLog(L.stress ? "stressed" : "outcome", designName(L.combo) + ": " + R.outcome.label); }
+    }
+    labSave(); render();
+  }
+  else if (a === "debrief") { labSet({ screen: "debrief" }); top(); }
+  else if (a === "reset") { store.del(labKey()); L = Object.assign(labFresh(), { screen: "brief", start: Date.now() }); labLog("start", "reset"); labSave(); render(); top(); }
+  else if (a === "copy") {
+    const txt = labSummary();
+    const done = () => { L.copied = true; render(); setTimeout(() => { L.copied = false; render(); }, 1800); };
+    try { navigator.clipboard.writeText(txt).then(done, () => fallbackCopy(txt)); } catch (e) { fallbackCopy(txt); }
+  }
+}
+
+engineChecks().filter(([, ok]) => !ok).forEach(([name]) => LAB_ERRORS.push("Engine check failed: " + name));
+render();
+</script>
+</body>
+</html>
